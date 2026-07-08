@@ -1,0 +1,15 @@
+Perubahan keeper dive/fall:
+
+1. Frame 4 sekarang menjadi titik awal jatuh untuk semua animasi loncat kanan/kiri.
+   - Jika bola tertangkap, bola langsung hilang di frame 4.
+   - Jika bola tidak tertangkap, keeper tetap jatuh setelah frame 4, tidak melayang.
+
+2. Animasi tidak lagi ditahan/di-pause di frame 4.
+   - Keeper langsung lanjut ayun ke frame 5, 6, 7.
+   - Posisi keeper bergerak ke bawah sambil geser ke arah lompatan.
+
+3. Ronde berikutnya baru diproses setelah animasi keeper selesai dan posisi jatuhnya selesai.
+
+Pengaturan utama ada di src/Main.java:
+- KEEPER_CATCH_FALL_SPEED: kecepatan jatuh keeper.
+- KEEPER_CATCH_FALL_SIDE_RATIO: jarak geser samping saat jatuh.

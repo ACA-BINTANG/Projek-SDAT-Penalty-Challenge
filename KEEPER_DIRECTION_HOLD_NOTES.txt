@@ -1,0 +1,19 @@
+Perubahan keeper direction + landing hold:
+
+1. Animasi lompat sekarang mengikuti arah gerak keeper, bukan arah bola.
+   Contoh: bola ke kanan tetapi target keeper bergerak ke kiri, maka gambar yang dipakai adalah folder lompat kiri.
+
+2. Pada frame jatuh/landing:
+   - frame 5 ditahan 2 detik
+   - frame 6 ditahan 2 detik
+   - frame 7 ditahan 2 detik
+
+3. Konstanta yang mengatur jeda landing ada di Main.java:
+   private static final double KEEPER_LANDING_FRAME_HOLD_SECONDS = 2.0;
+
+4. Frame akhir tetap memakai:
+   private static final double KEEPER_FINAL_HOLD_SECONDS = 2.0;
+
+5. Method baru:
+   resolveKeeperAnimationDirection(...)
+   Method ini menentukan folder animasi berdasarkan target gerak keeper.

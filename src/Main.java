@@ -39,6 +39,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class Main extends Application {
@@ -50,14 +52,31 @@ public class Main extends Application {
     private static final String TOURNAMENT_BRACKET_PATH = "resources/images/Bagan-Tournament.png";
     private static final String GOAL_BACKGROUND_PATH = "resources/images/GAWANG.png";
     private static final String BALL_IMAGE_PATH = "resources/images/BOLA.png";
-    private static final String KEEPER_IMAGE_PATH = "resources/images/KEEPER-01.png";
+    private static final String KEEPER_IMAGE_PATH = "resources/images/karakter/keper/berdiri/1.png";
+    private static final String KEEPER_IDLE_IMAGE_PATH = "resources/images/karakter/keper/berdiri/1.png";
+    private static final String KEEPER_STANDING_CATCH_IMAGE_PATH = "resources/images/karakter/keper/berdiri tangkap/2.png";
+    private static final String KEEPER_RIGHT_FOLDER = "resources/images/karakter/keper/lompat kanan";
+    private static final String KEEPER_RIGHT_CATCH_FOLDER = "resources/images/karakter/keper/lompatkanantangkap";
+    private static final String KEEPER_LEFT_FOLDER = "resources/images/karakter/keper/lompat kiri";
+    private static final String KEEPER_LEFT_CATCH_FOLDER = "resources/images/karakter/keper/lompattangkapkiri";
     private static final String TOP_SCORE_PATH = "top_scores.txt";
     private static final String START_FONT_PATH = "resources/fonts/MinecraftBoldItalic-1y1e.otf";
     private static final String MENU_FONT_PATH = "resources/fonts/MinecraftRegular-Bmg3.otf";
     private static final double MENU_OPTION_WIDTH = 286.5;
     private static final double MENU_OPTION_HEIGHT = 59.5;
     private static final double BALL_SIZE = 92;
-    private static final double KEEPER_SIZE = 145;
+    private static final double KEEPER_SIZE = 260;
+
+    // Sensor keeper mengikuti pose sprite hijau.
+    // Berdiri = sensor vertikal, lompat kiri/kanan = sensor horizontal.
+    private static final double KEEPER_STAND_SENSOR_WIDTH_RATIO = 0.40;
+    private static final double KEEPER_STAND_SENSOR_HEIGHT_RATIO = 0.86;
+    private static final double KEEPER_STAND_SENSOR_Y_OFFSET_RATIO = 0.03;
+    private static final double KEEPER_DIVE_SENSOR_WIDTH_RATIO = 1.44;
+    private static final double KEEPER_DIVE_SENSOR_HEIGHT_RATIO = 0.46;
+    private static final double KEEPER_DIVE_SENSOR_X_OFFSET_RATIO = 0.20;
+    private static final double KEEPER_DIVE_SENSOR_Y_OFFSET_RATIO = 0.10;
+    private static final double KEEPER_EDGE_PADDING_RATIO = 0.015;
     private static final double MAX_PULL_DISTANCE = 160;
     private static final double MIN_SHOT_DISTANCE = 150;
     private static final double MAX_SHOT_DISTANCE = 840;
@@ -66,12 +85,31 @@ public class Main extends Application {
     private static final double UPWARD_SHOT_BONUS = 1.08;
     private static final double KEEPER_MAX_READ_CHANCE = 0.82;
     private static final double KEEPER_READ_GROWTH_PER_POINT = 0.08;
+    private static final double KEEPER_FRAME_SECONDS = 0.19;
+    private static final double KEEPER_LANDING_FRAME_HOLD_SECONDS = 1.0;
+    private static final double ROUND_RESULT_DELAY_SECONDS = 0.05;
+    private static final double KEEPER_DIVE_TRIGGER_RATIO = 0.045;
+    private static final double KEEPER_FINAL_HOLD_SECONDS = 2.0;
+    private static final double KEEPER_MOVE_SPEED = 760;
+    private static final double KEEPER_CATCH_FALL_SPEED = 420;
+    private static final double KEEPER_CATCH_FALL_SIDE_RATIO = 0.50;
+    private static final double KEEPER_START_CENTER_Y_RATIO = 0.56;
+    private static final double KEEPER_GROUND_TARGET_Y_RATIO = 0.56;
+    private static final double KEEPER_FALL_FORWARD_OFFSET_RATIO = 0.030;
+    private static final double KEEPER_FRAME_5_DOWN_OFFSET = 42;
+    private static final double KEEPER_TOP_REACH_PADDING_RATIO = 0.012;
+    private static final double KEEPER_BOTTOM_REACH_PADDING_RATIO = 0.018;
     private static final double SHOT_MEMORY_WEIGHT = 0.35;
     private static final double GOAL_LEFT_RATIO = 0.24;
     private static final double GOAL_RIGHT_RATIO = 0.76;
     private static final double GOAL_TOP_RATIO = 0.28;
     private static final double GOAL_BOTTOM_RATIO = 0.65;
     private static final double GOAL_SCORE_LINE_RATIO = 0.30;
+    private static final int ROUND_RESULT_NONE = 0;
+    private static final int ROUND_RESULT_SAVED = 1;
+    private static final int ROUND_RESULT_GOAL = 2;
+    private static final int ROUND_RESULT_MISS = 3;
+    private static final boolean SHOW_DEBUG_BOXES = false;
     private static final int MAX_PLAYER_LIVES = 3;
     private static final int TOURNAMENT_SHOTS_PER_ROUND = 5;
     private static final String[] TOURNAMENT_ROUNDS = {"QUARTER FINAL", "SEMI FINAL", "FINAL"};
@@ -93,7 +131,7 @@ public class Main extends Application {
         StackPane root = new StackPane();
         root.setBackground(new Background(new BackgroundFill(Color.BLACK, CornerRadii.EMPTY, Insets.EMPTY)));
 
-        Path videoPath = Path.of(INTRO_VIDEO_PATH).toAbsolutePath().normalize();
+        Path videoPath = resolveResource(INTRO_VIDEO_PATH);
         if (!Files.exists(videoPath)) {
             showError(root, "Video tidak ditemukan:\n" + videoPath);
         } else {
@@ -153,6 +191,27 @@ public class Main extends Application {
         launch(args);
     }
 
+private Path resolveResource(String relativePath) {
+        Path cleanPath = Path.of(relativePath.replace("/", java.io.File.separator)).normalize();
+
+        Path[] candidates = new Path[] {
+                Path.of("").toAbsolutePath().resolve(cleanPath).normalize(),
+                Path.of(System.getProperty("user.dir", ".")).toAbsolutePath().resolve(cleanPath).normalize(),
+                Path.of(System.getProperty("user.dir", ".")).toAbsolutePath().getParent() != null
+                        ? Path.of(System.getProperty("user.dir", ".")).toAbsolutePath().getParent().resolve(cleanPath).normalize()
+                        : Path.of(System.getProperty("user.dir", ".")).toAbsolutePath().resolve(cleanPath).normalize(),
+                Path.of("src").toAbsolutePath().resolve(cleanPath).normalize()
+        };
+
+        for (Path candidate : candidates) {
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+
+        return candidates[0];
+    }
+
     private StackPane createStartButton() {
         Rectangle background = new Rectangle(190, 58);
         background.setArcWidth(58);
@@ -194,7 +253,7 @@ public class Main extends Application {
     }
 
     private Font loadFont(String fontPath, double size, Font fallbackFont) {
-        Path path = Path.of(fontPath).toAbsolutePath().normalize();
+        Path path = resolveResource(fontPath);
         if (!Files.exists(path)) {
             return fallbackFont;
         }
@@ -273,9 +332,23 @@ public class Main extends Application {
     }
 
     private ImageView createImageView(String imagePath) {
-        Path path = Path.of(imagePath).toAbsolutePath().normalize();
-        Image image = new Image(path.toUri().toString());
+        Path path = resolveResource(imagePath);
+        Image image = Files.exists(path)
+                ? new Image(path.toUri().toString(), false)
+                : createFallbackImage();
         return new ImageView(image);
+    }
+
+private Image createFallbackImage() {
+        javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(64, 64);
+        javafx.scene.canvas.GraphicsContext graphics = canvas.getGraphicsContext2D();
+        graphics.setFill(Color.rgb(40, 40, 40));
+        graphics.fillRect(0, 0, 64, 64);
+        graphics.setStroke(Color.WHITE);
+        graphics.strokeRect(1, 1, 62, 62);
+        javafx.scene.SnapshotParameters parameters = new javafx.scene.SnapshotParameters();
+        parameters.setFill(Color.TRANSPARENT);
+        return canvas.snapshot(parameters, null);
     }
 
     private Button createNavigationButton(String text) {
@@ -290,8 +363,8 @@ public class Main extends Application {
     }
 
     private void setImage(ImageView imageView, String imagePath) {
-        Path path = Path.of(imagePath).toAbsolutePath().normalize();
-        imageView.setImage(new Image(path.toUri().toString()));
+        Path path = resolveResource(imagePath);
+        imageView.setImage(Files.exists(path) ? new Image(path.toUri().toString(), false) : createFallbackImage());
     }
 
     private void showEndlessMode(Stage stage) {
@@ -307,6 +380,8 @@ public class Main extends Application {
         keeper.setFitWidth(KEEPER_SIZE);
         keeper.setFitHeight(KEEPER_SIZE);
         keeper.setPreserveRatio(true);
+        KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
+        keeperAnimator.showIdle();
 
         ImageView ball = createImageView(BALL_IMAGE_PATH);
         ball.setFitWidth(BALL_SIZE);
@@ -331,6 +406,7 @@ public class Main extends Application {
         pointBoxOverlay.setStroke(Color.rgb(255, 0, 0, 0.78));
         pointBoxOverlay.setStrokeWidth(3);
         pointBoxOverlay.setMouseTransparent(true);
+        pointBoxOverlay.setVisible(SHOW_DEBUG_BOXES);
         pointBoxOverlay.layoutXProperty().bind(root.widthProperty().multiply(GOAL_LEFT_RATIO));
         pointBoxOverlay.layoutYProperty().bind(root.heightProperty().multiply(GOAL_TOP_RATIO));
         pointBoxOverlay.widthProperty().bind(root.widthProperty().multiply(GOAL_RIGHT_RATIO - GOAL_LEFT_RATIO));
@@ -341,10 +417,7 @@ public class Main extends Application {
         keeperBoxOverlay.setStroke(Color.rgb(0, 255, 80, 0.82));
         keeperBoxOverlay.setStrokeWidth(3);
         keeperBoxOverlay.setMouseTransparent(true);
-        keeperBoxOverlay.layoutXProperty().bind(keeper.layoutXProperty());
-        keeperBoxOverlay.layoutYProperty().bind(keeper.layoutYProperty());
-        keeperBoxOverlay.widthProperty().bind(keeper.fitWidthProperty());
-        keeperBoxOverlay.heightProperty().bind(keeper.fitHeightProperty());
+        keeperBoxOverlay.setVisible(SHOW_DEBUG_BOXES);
 
         Text scoreText = new Text("POINT: 0");
         scoreText.setFill(Color.WHITE);
@@ -478,7 +551,7 @@ public class Main extends Application {
 
         EndlessState state = new EndlessState();
         state.lives = MAX_PLAYER_LIVES;
-        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state);
+        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state, keeperAnimator);
         Runnable restartGame = () -> {
             state.score = 0;
             state.lives = MAX_PLAYER_LIVES;
@@ -579,9 +652,10 @@ public class Main extends Application {
                 return;
             }
 
-            state.ballMoving = true;
-            state.keeperMoving = true;
             chooseKeeperTarget(root, state);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch);
+            state.ballMoving = true;
+            state.keeperMoving = state.keeperJumping;
         });
 
         AnimationTimer gameLoop = new AnimationTimer() {
@@ -600,6 +674,8 @@ public class Main extends Application {
                         root,
                         ball,
                         keeper,
+                        keeperAnimator,
+                        keeperBoxOverlay,
                         scoreText,
                         livesText,
                         lifeIndicators,
@@ -630,6 +706,8 @@ public class Main extends Application {
         keeper.setFitWidth(KEEPER_SIZE);
         keeper.setFitHeight(KEEPER_SIZE);
         keeper.setPreserveRatio(true);
+        KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
+        keeperAnimator.showIdle();
 
         ImageView ball = createImageView(BALL_IMAGE_PATH);
         ball.setFitWidth(BALL_SIZE);
@@ -778,7 +856,7 @@ public class Main extends Application {
         state.teamCount = 8;
         state.playerTeamName = "PLAYER FC";
         state.opponents = createTournamentOpponents(state.teamCount);
-        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state);
+        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state, keeperAnimator);
         Runnable refreshUi = () -> {
             updateTournamentTexts(roundText, targetText, shotsText, totalText, state);
             updateTournamentBracketLabels(bracketLabels, state);
@@ -966,9 +1044,10 @@ public class Main extends Application {
                 return;
             }
 
-            state.ballMoving = true;
-            state.keeperMoving = true;
             chooseKeeperTarget(root, state);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch);
+            state.ballMoving = true;
+            state.keeperMoving = state.keeperJumping;
         });
 
         AnimationTimer gameLoop = new AnimationTimer() {
@@ -987,6 +1066,7 @@ public class Main extends Application {
                         root,
                         ball,
                         keeper,
+                        keeperAnimator,
                         resultOverlay,
                         resultBox,
                         resultTitle,
@@ -1324,6 +1404,7 @@ public class Main extends Application {
             StackPane root,
             ImageView ball,
             ImageView keeper,
+            KeeperAnimator keeperAnimator,
             Rectangle resultOverlay,
             VBox resultBox,
             Text resultTitle,
@@ -1342,19 +1423,64 @@ public class Main extends Application {
             return;
         }
 
+        keeperAnimator.update(deltaSeconds);
+
+        if (keeperAnimator.consumeDiveFallEvent()) {
+            if (state.keeperDiveDirection != 0) {
+                startKeeperDiveFall(root, keeper, state);
+            }
+        }
+
+        if (keeperAnimator.consumeCatchBallHideEvent()) {
+            ball.setVisible(false);
+            state.ballMoving = false;
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
+        }
+
+        if (state.keeperFallingAfterCatch) {
+            updateKeeperDiveFall(keeper, state, deltaSeconds);
+        }
+
         if (state.keeperMoving) {
             double keeperCenterX = getCenterX(keeper);
             double keeperCenterY = getCenterY(keeper);
             double dx = state.keeperTargetX - keeperCenterX;
             double dy = state.keeperTargetY - keeperCenterY;
             double distance = Math.hypot(dx, dy);
-            double step = (540 + state.roundIndex * 45) * deltaSeconds;
+            double step = (KEEPER_MOVE_SPEED + state.roundIndex * 45) * deltaSeconds;
             if (distance <= step) {
                 setCenter(keeper, state.keeperTargetX, state.keeperTargetY);
                 state.keeperMoving = false;
             } else {
                 setCenter(keeper, keeperCenterX + dx / distance * step, keeperCenterY + dy / distance * step);
             }
+        }
+
+        if (state.roundResolving) {
+            state.roundResolveTimer -= deltaSeconds;
+            if (state.roundResolveTimer <= 0) {
+                int result = state.roundResult;
+                state.roundResolving = false;
+                state.awaitingKeeperAnimationFinish = false;
+                state.pendingRoundResult = ROUND_RESULT_NONE;
+                state.roundResult = ROUND_RESULT_NONE;
+                state.roundResolveTimer = 0;
+
+                if (result == ROUND_RESULT_GOAL) {
+                    rememberScoredShot(state);
+                    registerTournamentShot(true, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+                } else {
+                    registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+                }
+            }
+            return;
+        }
+
+        if (state.awaitingKeeperAnimationFinish) {
+            if (keeperAnimator.isSequenceFinished() && !state.keeperFallingAfterCatch) {
+                beginRoundResolution(state, state.pendingRoundResult);
+            }
+            return;
         }
 
         if (!state.ballMoving) {
@@ -1376,25 +1502,25 @@ public class Main extends Application {
             );
         }
 
-        if (reachedTarget && isShotSavedByKeeper(root, keeper, state)) {
-            registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
-            return;
-        }
-
         double width = root.getWidth();
         double height = root.getHeight();
-        if (reachedTarget && isBallInsidePointBox(root, ball)) {
-            rememberScoredShot(state);
-            registerTournamentShot(true, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
-            return;
-        }
-
         boolean outsideScreen = getCenterX(ball) < -80
                 || getCenterX(ball) > width + 80
                 || getCenterY(ball) < -80
                 || getCenterY(ball) > height + 80;
+
+        if (reachedTarget && isShotSavedByKeeper(keeper, keeperAnimator, state)) {
+            state.ballMoving = false;
+            return;
+        }
+
+        if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
+            return;
+        }
+
         if (outsideScreen || reachedTarget) {
-            registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_MISS);
         }
     }
 
@@ -1491,6 +1617,8 @@ public class Main extends Application {
             StackPane root,
             ImageView ball,
             ImageView keeper,
+            KeeperAnimator keeperAnimator,
+            Rectangle keeperBoxOverlay,
             Text scoreText,
             Text livesText,
             Rectangle[] lifeIndicators,
@@ -1507,19 +1635,67 @@ public class Main extends Application {
             return;
         }
 
+        keeperAnimator.update(deltaSeconds);
+        updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+
+        if (keeperAnimator.consumeDiveFallEvent()) {
+            if (state.keeperDiveDirection != 0) {
+                startKeeperDiveFall(root, keeper, state);
+            }
+        }
+
+        if (keeperAnimator.consumeCatchBallHideEvent()) {
+            ball.setVisible(false);
+            state.ballMoving = false;
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
+        }
+
+        if (state.keeperFallingAfterCatch) {
+            updateKeeperDiveFall(keeper, state, deltaSeconds);
+            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+        }
+
         if (state.keeperMoving) {
             double keeperCenterX = getCenterX(keeper);
             double keeperCenterY = getCenterY(keeper);
             double dx = state.keeperTargetX - keeperCenterX;
             double dy = state.keeperTargetY - keeperCenterY;
             double distance = Math.hypot(dx, dy);
-            double step = 520 * deltaSeconds;
+            double step = KEEPER_MOVE_SPEED * deltaSeconds;
             if (distance <= step) {
                 setCenter(keeper, state.keeperTargetX, state.keeperTargetY);
                 state.keeperMoving = false;
             } else {
                 setCenter(keeper, keeperCenterX + dx / distance * step, keeperCenterY + dy / distance * step);
             }
+            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+        }
+
+        if (state.roundResolving) {
+            state.roundResolveTimer -= deltaSeconds;
+            if (state.roundResolveTimer <= 0) {
+                finishRoundResolution(
+                        state,
+                        scoreText,
+                        livesText,
+                        lifeIndicators,
+                        gameOverOverlay,
+                        gameOverText,
+                        saveScoreBox,
+                        finalScoreText,
+                        nameInput,
+                        resetRound,
+                        ball
+                );
+            }
+            return;
+        }
+
+        if (state.awaitingKeeperAnimationFinish) {
+            if (keeperAnimator.isSequenceFinished() && !state.keeperFallingAfterCatch) {
+                beginRoundResolution(state, state.pendingRoundResult);
+            }
+            return;
         }
 
         if (!state.ballMoving) {
@@ -1541,25 +1717,122 @@ public class Main extends Application {
             );
         }
 
-        if (reachedTarget && isShotSavedByKeeper(root, keeper, state)) {
-            damagePlayer(
-                    ball,
-                    state,
-                    livesText,
-                    lifeIndicators,
-                    gameOverOverlay,
-                    gameOverText,
-                    saveScoreBox,
-                    finalScoreText,
-                    nameInput,
-                    resetRound
-            );
+        double width = root.getWidth();
+        double height = root.getHeight();
+        boolean outsideScreen = getCenterX(ball) < -80
+                || getCenterX(ball) > width + 80
+                || getCenterY(ball) < -80
+                || getCenterY(ball) > height + 80;
+
+        if (reachedTarget && isShotSavedByKeeper(keeper, keeperAnimator, state)) {
+            state.ballMoving = false;
             return;
         }
 
-        double width = root.getWidth();
-        double height = root.getHeight();
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
+            return;
+        }
+
+        if (outsideScreen || reachedTarget) {
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_MISS);
+        }
+    }
+
+    private void startKeeperDiveFall(StackPane root, ImageView keeper, EndlessState state) {
+        // Frame 4 adalah titik ayunan/lompatan. Setelah frame ini keeper selalu turun
+        // sambil tetap geser ke arah lompatan, baik bola tertangkap maupun tidak.
+        state.keeperMoving = false;
+        state.keeperFallingAfterCatch = true;
+
+        double direction = state.keeperDiveDirection == 0 ? 0 : Math.signum(state.keeperDiveDirection);
+        double currentX = getCenterX(keeper);
+        double currentY = getCenterY(keeper);
+
+        double fallSideDistance = KEEPER_SIZE * KEEPER_CATCH_FALL_SIDE_RATIO;
+        state.keeperFallTargetX = clamp(
+                currentX + direction * fallSideDistance,
+                getKeeperMovementMinX(root),
+                getKeeperMovementMaxX(root)
+        );
+        double fallTargetY = root.getHeight() * KEEPER_GROUND_TARGET_Y_RATIO
+                + root.getHeight() * KEEPER_FALL_FORWARD_OFFSET_RATIO;
+
+        state.keeperFallTargetY = Math.max(
+                currentY,
+                fallTargetY
+        );
+    }
+
+    private void updateKeeperDiveFall(
+            ImageView keeper,
+            EndlessState state,
+            double deltaSeconds
+    ) {
+        double keeperCenterX = getCenterX(keeper);
+        double keeperCenterY = getCenterY(keeper);
+        double dx = state.keeperFallTargetX - keeperCenterX;
+        double dy = state.keeperFallTargetY - keeperCenterY;
+        double distance = Math.hypot(dx, dy);
+        double step = KEEPER_CATCH_FALL_SPEED * deltaSeconds;
+
+        if (distance <= step || distance <= 1.0) {
+            setCenter(keeper, state.keeperFallTargetX, state.keeperFallTargetY);
+            state.keeperFallingAfterCatch = false;
+            return;
+        }
+
+        setCenter(
+                keeper,
+                keeperCenterX + dx / distance * step,
+                keeperCenterY + dy / distance * step
+        );
+    }
+
+    private void beginRoundResolution(EndlessState state, int roundResult) {
+        state.ballMoving = false;
+        state.dragging = false;
+        state.keeperMoving = false;
+        state.keeperFallingAfterCatch = false;
+        state.roundResolving = true;
+        state.roundResult = roundResult;
+        state.roundResolveTimer = ROUND_RESULT_DELAY_SECONDS;
+    }
+
+    private void queueRoundResolutionAfterKeeperAnimation(EndlessState state, int roundResult) {
+        state.ballMoving = false;
+        state.dragging = false;
+        state.pendingRoundResult = roundResult;
+
+        if (state.keeperDiveDirection == 0 && !state.keeperJumping) {
+            beginRoundResolution(state, roundResult);
+            return;
+        }
+
+        state.awaitingKeeperAnimationFinish = true;
+    }
+
+    private void finishRoundResolution(
+            EndlessState state,
+            Text scoreText,
+            Text livesText,
+            Rectangle[] lifeIndicators,
+            Rectangle gameOverOverlay,
+            Text gameOverText,
+            VBox saveScoreBox,
+            Text finalScoreText,
+            TextField nameInput,
+            Runnable resetRound,
+            ImageView ball
+    ) {
+        int result = state.roundResult;
+        state.roundResolving = false;
+        state.awaitingKeeperAnimationFinish = false;
+        state.pendingRoundResult = ROUND_RESULT_NONE;
+        state.roundResult = ROUND_RESULT_NONE;
+        state.roundResolveTimer = 0;
+
+        if (result == ROUND_RESULT_GOAL) {
             rememberScoredShot(state);
             state.score++;
             scoreText.setText("POINT: " + state.score);
@@ -1567,24 +1840,18 @@ public class Main extends Application {
             return;
         }
 
-        boolean outsideScreen = getCenterX(ball) < -80
-                || getCenterX(ball) > width + 80
-                || getCenterY(ball) < -80
-                || getCenterY(ball) > height + 80;
-        if (outsideScreen || reachedTarget) {
-            damagePlayer(
-                    ball,
-                    state,
-                    livesText,
-                    lifeIndicators,
-                    gameOverOverlay,
-                    gameOverText,
-                    saveScoreBox,
-                    finalScoreText,
-                    nameInput,
-                    resetRound
-            );
-        }
+        damagePlayer(
+                ball,
+                state,
+                livesText,
+                lifeIndicators,
+                gameOverOverlay,
+                gameOverText,
+                saveScoreBox,
+                finalScoreText,
+                nameInput,
+                resetRound
+        );
     }
 
     private boolean isBallInsidePointBox(StackPane root, ImageView ball) {
@@ -1597,16 +1864,39 @@ public class Main extends Application {
         return !state.keeperJumping && isPointInsidePointBox(root, state.targetX, state.targetY);
     }
 
-    private boolean isShotSavedByKeeper(StackPane root, ImageView keeper, EndlessState state) {
-        return isPointInsideKeeperBox(keeper, state.targetX, state.targetY)
-                && !canBallPassStandingKeeper(root, state);
+    private boolean isShotSavedByKeeper(ImageView keeper, KeeperAnimator keeperAnimator, EndlessState state) {
+        if (!state.keeperWillCatch) {
+            return false;
+        }
+
+        // Tangkap hanya dianggap valid jika titik bola masuk sensor keeper.
+        // Sensor ini berubah bentuk mengikuti animasi: berdiri vertikal, lompat horizontal.
+        return isPointInsideKeeperSensorBoxAt(
+                getCenterX(keeper),
+                getCenterY(keeper),
+                state.keeperDiveDirection,
+                keeperAnimator.getCurrentLogicalFrameNumber(),
+                state.targetX,
+                state.targetY
+        ) || isPointInsideKeeperSensorBoxAt(
+                state.keeperTargetX,
+                state.keeperTargetY,
+                state.keeperDiveDirection,
+                4,
+                state.targetX,
+                state.targetY
+        );
     }
 
     private boolean isPointInsideKeeperBox(ImageView keeper, double pointX, double pointY) {
-        return pointX >= keeper.getLayoutX()
-                && pointX <= keeper.getLayoutX() + keeper.getFitWidth()
-                && pointY >= keeper.getLayoutY()
-                && pointY <= keeper.getLayoutY() + keeper.getFitHeight();
+        return isPointInsideKeeperSensorBoxAt(
+                getCenterX(keeper),
+                getCenterY(keeper),
+                0,
+                1,
+                pointX,
+                pointY
+        );
     }
 
     private boolean isPointInsidePointBox(StackPane root, double pointX, double pointY) {
@@ -1619,13 +1909,18 @@ public class Main extends Application {
                 && pointY <= height * GOAL_BOTTOM_RATIO;
     }
 
+    private void setKeeperToIdlePosition(StackPane root, ImageView keeper) {
+        setCenter(keeper, root.getWidth() * 0.5, root.getHeight() * KEEPER_START_CENTER_Y_RATIO);
+    }
+
     private void resetEndlessRound(
             StackPane root,
             ImageView ball,
             ImageView keeper,
             Line pullLine,
             Circle targetMarker,
-            EndlessState state
+            EndlessState state,
+            KeeperAnimator keeperAnimator
     ) {
         if (root.getWidth() <= 0 || root.getHeight() <= 0) {
             return;
@@ -1634,17 +1929,27 @@ public class Main extends Application {
         state.ballMoving = false;
         state.dragging = false;
         state.keeperMoving = false;
+        state.keeperFallingAfterCatch = false;
         state.keeperJumping = false;
+        state.keeperWillCatch = false;
+        state.keeperDiveDirection = 0;
+        state.roundResolving = false;
+        state.awaitingKeeperAnimationFinish = false;
+        state.pendingRoundResult = ROUND_RESULT_NONE;
+        state.roundResult = ROUND_RESULT_NONE;
+        state.roundResolveTimer = 0;
         state.velocityX = 0;
         state.velocityY = 0;
         state.shotSpeed = 0;
         state.anchorX = root.getWidth() * 0.5;
-        state.anchorY = root.getHeight() * 0.82;
+        state.anchorY = root.getHeight() * 0.78;
         state.targetX = state.anchorX;
         state.targetY = state.anchorY;
 
+        ball.setVisible(true);
         setCenter(ball, state.anchorX, state.anchorY);
-        setCenter(keeper, root.getWidth() * 0.5, root.getHeight() * 0.53);
+        setKeeperToIdlePosition(root, keeper);
+        keeperAnimator.showIdle();
         pullLine.setVisible(false);
         targetMarker.setVisible(false);
     }
@@ -1705,28 +2010,216 @@ public class Main extends Application {
     }
 
     private void chooseKeeperTarget(StackPane root, EndlessState state) {
-        double keeperHalfWidth = KEEPER_SIZE / 2;
-        double keeperHalfHeight = KEEPER_SIZE / 2;
-        double left = root.getWidth() * GOAL_LEFT_RATIO + keeperHalfWidth;
-        double right = root.getWidth() * GOAL_RIGHT_RATIO - keeperHalfWidth;
-        double top = root.getHeight() * GOAL_TOP_RATIO + keeperHalfHeight;
-        double bottom = root.getHeight() * GOAL_BOTTOM_RATIO - keeperHalfHeight;
+        double centerX = root.getWidth() * 0.5;
+        double centerY = root.getHeight() * KEEPER_START_CENTER_Y_RATIO;
+        double sideThreshold = Math.max(42, root.getWidth() * KEEPER_DIVE_TRIGGER_RATIO);
+        double targetOffsetX = state.targetX - centerX;
 
-        double readChance = Math.min(KEEPER_MAX_READ_CHANCE, state.score * KEEPER_READ_GROWTH_PER_POINT);
-        boolean readPlayerHabit = state.scoredShotsLearned > 0 && random.nextDouble() < readChance;
-        if (readPlayerHabit) {
-            double noise = Math.max(18, root.getWidth() * (0.15 - Math.min(state.score, 10) * 0.009));
-            state.keeperTargetX = clamp(state.learnedTargetX + randomBetween(-noise, noise), left, right);
-            state.keeperTargetY = clamp(state.learnedTargetY + randomBetween(-noise, noise), top, bottom);
+        int ballDirection;
+        if (targetOffsetX > sideThreshold) {
+            ballDirection = 1;
+        } else if (targetOffsetX < -sideThreshold) {
+            ballDirection = -1;
         } else {
-            state.keeperTargetX = randomBetween(left, right);
-            state.keeperTargetY = randomBetween(top, bottom);
+            ballDirection = 0;
+        }
+        state.keeperDiveDirection = ballDirection;
+
+        boolean shotInsideGoal = isPointInsidePointBox(root, state.targetX, state.targetY);
+        double readChance = Math.min(KEEPER_MAX_READ_CHANCE, 0.36 + state.score * KEEPER_READ_GROWTH_PER_POINT);
+        if (state.scoredShotsLearned > 0) {
+            double learnedDistance = Math.hypot(state.targetX - state.learnedTargetX, state.targetY - state.learnedTargetY);
+            if (learnedDistance < root.getWidth() * 0.11) {
+                readChance = Math.min(KEEPER_MAX_READ_CHANCE, readChance + 0.16);
+            }
+        }
+        if (ballDirection == 0) {
+            readChance = Math.min(KEEPER_MAX_READ_CHANCE, readChance + 0.10);
         }
 
-        state.keeperJumping = Math.hypot(
-                state.keeperTargetX - root.getWidth() * 0.5,
-                state.keeperTargetY - root.getHeight() * 0.53
-        ) > 18;
+        state.keeperWillCatch = shotInsideGoal && random.nextDouble() < readChance;
+
+        double minCenterX = getKeeperMovementMinX(root);
+        double maxCenterX = getKeeperMovementMaxX(root);
+        double minCenterY = getKeeperMovementMinY(root);
+        double maxCenterY = getKeeperMovementMaxY(root);
+
+        if (ballDirection == 0) {
+            state.keeperTargetX = centerX;
+            if (state.keeperWillCatch) {
+                // Tendangan lurus ke atas tetap bisa dibaca keeper.
+                // Center Y diarahkan ke titik bola, bukan dikunci di posisi berdiri.
+                state.keeperTargetY = clamp(
+                        state.targetY - getKeeperSensorOffsetY(0),
+                        minCenterY,
+                        maxCenterY
+                );
+            } else {
+                state.keeperTargetY = centerY;
+            }
+            state.keeperJumping = Math.hypot(state.keeperTargetX - centerX, state.keeperTargetY - centerY) > 18;
+            state.keeperDiveDirection = resolveKeeperAnimationDirection(centerX, state.keeperTargetX, ballDirection, sideThreshold);
+            return;
+        }
+
+        int direction = ballDirection;
+        double catchCenterY = clamp(
+                state.targetY - getKeeperSensorOffsetY(direction),
+                minCenterY,
+                maxCenterY
+        );
+
+        if (state.keeperWillCatch) {
+            // Untuk tangkapan, center keeper dihitung dari sensor horizontal.
+            // Y tidak lagi dipaksa jatuh ke bawah; keeper bisa naik ke pojok atas gawang.
+            state.keeperTargetX = clamp(
+                    state.targetX - getKeeperSensorOffsetX(direction),
+                    minCenterX,
+                    maxCenterX
+            );
+            state.keeperTargetY = catchCenterY;
+
+            // Jika tendangan sangat ke ujung dan sensor belum masuk titik bola, geser lagi sampai batas gerak.
+            if (!isPointInsideKeeperSensorBoxAt(state.keeperTargetX, state.keeperTargetY, direction, 4, state.targetX, state.targetY)) {
+                state.keeperTargetX = clamp(
+                        state.targetX - getKeeperSensorOffsetX(direction) - direction * KEEPER_SIZE * 0.18,
+                        minCenterX,
+                        maxCenterX
+                );
+            }
+        } else {
+            // Kalau tidak menangkap, keeper sengaja dibuat meleset.
+            // Arah gambar animasi nanti mengikuti arah target keeper, bukan arah bola.
+            double verticalMissOffset = state.targetY < centerY ? KEEPER_SIZE * 0.22 : -KEEPER_SIZE * 0.10;
+            state.keeperTargetX = clamp(
+                    state.targetX - getKeeperSensorOffsetX(direction) - direction * KEEPER_SIZE * 0.72,
+                    minCenterX,
+                    maxCenterX
+            );
+            state.keeperTargetY = clamp(
+                    catchCenterY + verticalMissOffset,
+                    minCenterY,
+                    maxCenterY
+            );
+
+            if (isPointInsideKeeperSensorBoxAt(state.keeperTargetX, state.keeperTargetY, direction, 4, state.targetX, state.targetY)) {
+                state.keeperTargetX = clamp(
+                        state.keeperTargetX - direction * KEEPER_SIZE * 0.55,
+                        minCenterX,
+                        maxCenterX
+                );
+            }
+        }
+
+        state.keeperJumping = Math.hypot(state.keeperTargetX - centerX, state.keeperTargetY - centerY) > 18;
+        state.keeperDiveDirection = resolveKeeperAnimationDirection(centerX, state.keeperTargetX, ballDirection, sideThreshold);
+    }
+
+    private int resolveKeeperAnimationDirection(double startX, double targetX, int fallbackDirection, double sideThreshold) {
+        double movementOffsetX = targetX - startX;
+        double movementThreshold = Math.max(10, sideThreshold * 0.20);
+        if (movementOffsetX > movementThreshold) {
+            return 1;
+        }
+        if (movementOffsetX < -movementThreshold) {
+            return -1;
+        }
+        return fallbackDirection;
+    }
+
+    private double getKeeperMovementMinX(StackPane root) {
+        return root.getWidth() * GOAL_LEFT_RATIO + root.getWidth() * KEEPER_EDGE_PADDING_RATIO;
+    }
+
+    private double getKeeperMovementMaxX(StackPane root) {
+        return root.getWidth() * GOAL_RIGHT_RATIO - root.getWidth() * KEEPER_EDGE_PADDING_RATIO;
+    }
+
+    private double getKeeperMovementMinY(StackPane root) {
+        return root.getHeight() * GOAL_TOP_RATIO + root.getHeight() * KEEPER_TOP_REACH_PADDING_RATIO;
+    }
+
+    private double getKeeperMovementMaxY(StackPane root) {
+        return root.getHeight() * GOAL_BOTTOM_RATIO - root.getHeight() * KEEPER_BOTTOM_REACH_PADDING_RATIO;
+    }
+
+    private double getKeeperSensorWidth(int direction, int logicalFrameNumber) {
+        if (direction == 0 || logicalFrameNumber <= 1) {
+            return KEEPER_SIZE * KEEPER_STAND_SENSOR_WIDTH_RATIO;
+        }
+        return KEEPER_SIZE * KEEPER_DIVE_SENSOR_WIDTH_RATIO;
+    }
+
+    private double getKeeperSensorHeight(int direction, int logicalFrameNumber) {
+        if (direction == 0 || logicalFrameNumber <= 1) {
+            return KEEPER_SIZE * KEEPER_STAND_SENSOR_HEIGHT_RATIO;
+        }
+        return KEEPER_SIZE * KEEPER_DIVE_SENSOR_HEIGHT_RATIO;
+    }
+
+    private double getKeeperSensorOffsetX(int direction) {
+        return direction * KEEPER_SIZE * KEEPER_DIVE_SENSOR_X_OFFSET_RATIO;
+    }
+
+    private double getKeeperSensorOffsetY(int direction) {
+        if (direction == 0) {
+            return KEEPER_SIZE * KEEPER_STAND_SENSOR_Y_OFFSET_RATIO;
+        }
+        return KEEPER_SIZE * KEEPER_DIVE_SENSOR_Y_OFFSET_RATIO;
+    }
+
+    private KeeperSensorBox getKeeperSensorBoxAt(double keeperCenterX, double keeperCenterY, int direction, int logicalFrameNumber) {
+        double sensorWidth = getKeeperSensorWidth(direction, logicalFrameNumber);
+        double sensorHeight = getKeeperSensorHeight(direction, logicalFrameNumber);
+        double sensorCenterX = keeperCenterX + getKeeperSensorOffsetX(direction);
+        double sensorCenterY = keeperCenterY + getKeeperSensorOffsetY(direction);
+
+        return new KeeperSensorBox(
+                sensorCenterX - sensorWidth / 2,
+                sensorCenterY - sensorHeight / 2,
+                sensorWidth,
+                sensorHeight
+        );
+    }
+
+    private boolean isPointInsideKeeperSensorBoxAt(
+            double keeperCenterX,
+            double keeperCenterY,
+            int direction,
+            int logicalFrameNumber,
+            double pointX,
+            double pointY
+    ) {
+        KeeperSensorBox sensorBox = getKeeperSensorBoxAt(keeperCenterX, keeperCenterY, direction, logicalFrameNumber);
+        return pointX >= sensorBox.x
+                && pointX <= sensorBox.x + sensorBox.width
+                && pointY >= sensorBox.y
+                && pointY <= sensorBox.y + sensorBox.height;
+    }
+
+    private void updateKeeperSensorOverlay(
+            Rectangle keeperBoxOverlay,
+            ImageView keeper,
+            KeeperAnimator keeperAnimator,
+            EndlessState state
+    ) {
+        if (keeperBoxOverlay == null) {
+            return;
+        }
+
+        int direction = state.keeperDiveDirection;
+        int logicalFrameNumber = keeperAnimator.getCurrentLogicalFrameNumber();
+        KeeperSensorBox sensorBox = getKeeperSensorBoxAt(
+                getCenterX(keeper),
+                getCenterY(keeper),
+                direction,
+                logicalFrameNumber
+        );
+
+        keeperBoxOverlay.setLayoutX(sensorBox.x);
+        keeperBoxOverlay.setLayoutY(sensorBox.y);
+        keeperBoxOverlay.setWidth(sensorBox.width);
+        keeperBoxOverlay.setHeight(sensorBox.height);
     }
 
     private void rememberScoredShot(EndlessState state) {
@@ -1805,6 +2298,18 @@ public class Main extends Application {
         double distance = MIN_SHOT_DISTANCE + (maxDistance - MIN_SHOT_DISTANCE) * tunedPower;
         double speed = MIN_BALL_SPEED + (MAX_BALL_SPEED - MIN_BALL_SPEED) * tunedPower;
 
+        // Fix tendangan lurus ke atas.
+        // Sebelumnya bola bisa melewati bagian atas layar karena target Y terlalu jauh.
+        // Kalau arah bola memang ke gawang dan targetnya melewati mistar atas, hentikan titik target di area atas gawang.
+        if (directionY < -0.35) {
+            double startY = getBallStartY(root);
+            double targetY = startY + directionY * distance;
+            double goalTopY = root.getHeight() * GOAL_TOP_RATIO;
+            if (targetY < goalTopY) {
+                distance = Math.abs((goalTopY - startY) / directionY);
+            }
+        }
+
         return new Shot(directionX, directionY, distance, speed);
     }
 
@@ -1843,10 +2348,242 @@ public class Main extends Application {
         imageView.setLayoutY(centerY - imageView.getFitHeight() / 2);
     }
 
+    private class KeeperAnimator {
+        private final ImageView imageView;
+        private final Image idleImage;
+        private final Image standingCatchImage;
+        private List<Image> frames;
+        private List<Integer> logicalFrameNumbers;
+        private int frameIndex;
+        private double frameTimer;
+        private boolean playing;
+        private boolean sequenceFinished;
+        private double finalFrameHoldTimer;
+        private boolean catchBall;
+        private boolean catchBallHideEventPending;
+        private boolean catchBallHideEventFired;
+        private boolean diveFallEventPending;
+        private boolean diveFallEventFired;
+
+        private KeeperAnimator(ImageView imageView) {
+            this.imageView = imageView;
+            this.idleImage = loadKeeperImage(KEEPER_IDLE_IMAGE_PATH);
+            this.standingCatchImage = loadKeeperImage(KEEPER_STANDING_CATCH_IMAGE_PATH);
+            this.frames = new ArrayList<>();
+            this.logicalFrameNumbers = new ArrayList<>();
+            this.frames.add(idleImage);
+            this.logicalFrameNumbers.add(1);
+        }
+
+        private void showIdle() {
+            playing = false;
+            sequenceFinished = false;
+            catchBall = false;
+            catchBallHideEventPending = false;
+            catchBallHideEventFired = false;
+            diveFallEventPending = false;
+            diveFallEventFired = false;
+            finalFrameHoldTimer = 0;
+            frameTimer = 0;
+            frameIndex = 0;
+            logicalFrameNumbers = new ArrayList<>();
+            logicalFrameNumbers.add(1);
+            frames = new ArrayList<>();
+            frames.add(idleImage);
+            imageView.setImage(idleImage);
+            applyFrameVisualOffset();
+        }
+
+        private void startDive(int direction, boolean catchBall) {
+            this.catchBall = catchBall;
+            this.catchBallHideEventPending = false;
+            this.catchBallHideEventFired = false;
+            this.diveFallEventPending = false;
+            this.diveFallEventFired = false;
+            this.sequenceFinished = false;
+            this.finalFrameHoldTimer = 0;
+            DiveFrameSequence sequence = buildDiveFrames(direction, catchBall);
+            frames = sequence.images;
+            logicalFrameNumbers = sequence.logicalFrameNumbers;
+            frameIndex = 0;
+            frameTimer = 0;
+            playing = !frames.isEmpty();
+            imageView.setImage(frames.get(0));
+            applyFrameVisualOffset();
+        }
+
+        private void update(double deltaSeconds) {
+            if (frames.isEmpty()) {
+                return;
+            }
+
+            if (!playing) {
+                return;
+            }
+
+            frameTimer += deltaSeconds;
+            while (playing) {
+                double currentFrameDuration = getCurrentFrameDuration();
+                if (frameTimer < currentFrameDuration) {
+                    break;
+                }
+
+                frameTimer -= currentFrameDuration;
+                if (frameIndex < frames.size() - 1) {
+                    frameIndex++;
+                    imageView.setImage(frames.get(frameIndex));
+                    applyFrameVisualOffset();
+                    int logicalFrame = getCurrentLogicalFrameNumber();
+                    if (logicalFrameNumbers.size() > 2 && !diveFallEventFired && logicalFrame >= 4) {
+                        diveFallEventPending = true;
+                        diveFallEventFired = true;
+                    }
+                    if (catchBall && !catchBallHideEventFired && logicalFrame >= getCatchHideFrameNumber()) {
+                        catchBallHideEventPending = true;
+                        catchBallHideEventFired = true;
+                    }
+                    if (frameIndex == frames.size() - 1) {
+                        finalFrameHoldTimer = 0;
+                    }
+                } else {
+                    playing = false;
+                    sequenceFinished = true;
+                }
+            }
+        }
+
+        private void applyFrameVisualOffset() {
+            int logicalFrame = getCurrentLogicalFrameNumber();
+
+            if (logicalFrame == 5) {
+                imageView.setTranslateY(KEEPER_FRAME_5_DOWN_OFFSET);
+            } else {
+                imageView.setTranslateY(0);
+            }
+        }
+
+        private double getCurrentFrameDuration() {
+            int logicalFrame = getCurrentLogicalFrameNumber();
+            if (logicalFrame >= 5 && logicalFrame < 7) {
+                return KEEPER_LANDING_FRAME_HOLD_SECONDS;
+            }
+            if (logicalFrame >= 7) {
+                return KEEPER_FINAL_HOLD_SECONDS;
+            }
+            return KEEPER_FRAME_SECONDS;
+        }
+
+        private boolean consumeDiveFallEvent() {
+            boolean result = diveFallEventPending;
+            diveFallEventPending = false;
+            return result;
+        }
+
+        private int getCatchHideFrameNumber() {
+            if (logicalFrameNumbers.size() <= 2) {
+                return 2;
+            }
+            return 4;
+        }
+
+        private boolean consumeCatchBallHideEvent() {
+            boolean result = catchBallHideEventPending;
+            catchBallHideEventPending = false;
+            return result;
+        }
+
+        private boolean isSequenceFinished() {
+            return sequenceFinished || frames.size() <= 1;
+        }
+
+        private int getCurrentLogicalFrameNumber() {
+            if (logicalFrameNumbers.isEmpty()) {
+                return 1;
+            }
+            return logicalFrameNumbers.get(Math.max(0, Math.min(frameIndex, logicalFrameNumbers.size() - 1)));
+        }
+
+        private DiveFrameSequence buildDiveFrames(int direction, boolean catchBall) {
+            List<Image> result = new ArrayList<>();
+            List<Integer> frameNumbers = new ArrayList<>();
+            result.add(idleImage);
+            frameNumbers.add(1);
+
+            if (direction == 0) {
+                if (catchBall) {
+                    result.add(standingCatchImage);
+                    frameNumbers.add(2);
+                }
+                return new DiveFrameSequence(result, frameNumbers);
+            }
+
+            String normalFolder = direction > 0 ? KEEPER_RIGHT_FOLDER : KEEPER_LEFT_FOLDER;
+            String catchFolder = direction > 0 ? KEEPER_RIGHT_CATCH_FOLDER : KEEPER_LEFT_CATCH_FOLDER;
+
+            for (int frameNumber = 2; frameNumber <= 7; frameNumber++) {
+                boolean useCatchFolder = catchBall && frameNumber >= 4;
+                String primaryPath = framePath(useCatchFolder ? catchFolder : normalFolder, frameNumber);
+                String fallbackPath = framePath(useCatchFolder ? normalFolder : catchFolder, frameNumber);
+                result.add(loadKeeperImage(primaryPath, fallbackPath, KEEPER_IDLE_IMAGE_PATH));
+                frameNumbers.add(frameNumber);
+            }
+
+            return new DiveFrameSequence(result, frameNumbers);
+        }
+
+        private String framePath(String folder, int frameNumber) {
+            return folder + "/" + frameNumber + ".png";
+        }
+
+        private Image loadKeeperImage(String primaryPath) {
+            return loadKeeperImage(primaryPath, null, KEEPER_IDLE_IMAGE_PATH);
+        }
+
+        private Image loadKeeperImage(String primaryPath, String secondaryPath, String fallbackPath) {
+            String[] candidates = secondaryPath == null
+                    ? new String[] { primaryPath, fallbackPath }
+                    : new String[] { primaryPath, secondaryPath, fallbackPath };
+
+            for (String candidate : candidates) {
+                Path path = resolveResource(candidate);
+                if (Files.exists(path)) {
+                    return new Image(path.toUri().toString(), false);
+                }
+            }
+
+            return createFallbackImage();
+        }
+    }
+
+    private static class KeeperSensorBox {
+        private final double x;
+        private final double y;
+        private final double width;
+        private final double height;
+
+        private KeeperSensorBox(double x, double y, double width, double height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    private static class DiveFrameSequence {
+        private final List<Image> images;
+        private final List<Integer> logicalFrameNumbers;
+
+        private DiveFrameSequence(List<Image> images, List<Integer> logicalFrameNumbers) {
+            this.images = images;
+            this.logicalFrameNumbers = logicalFrameNumbers;
+        }
+    }
+
     private static class EndlessState {
         boolean dragging;
         boolean ballMoving;
         boolean keeperMoving;
+        boolean keeperFallingAfterCatch;
         boolean keeperJumping;
         double anchorX;
         double anchorY;
@@ -1857,12 +2594,21 @@ public class Main extends Application {
         double shotSpeed;
         double keeperTargetX;
         double keeperTargetY;
+        double keeperFallTargetX;
+        double keeperFallTargetY;
         double learnedTargetX;
         double learnedTargetY;
         int scoredShotsLearned;
         int score;
         int lives;
+        int keeperDiveDirection;
+        int roundResult;
+        double roundResolveTimer;
+        boolean keeperWillCatch;
+        boolean roundResolving;
+        boolean awaitingKeeperAnimationFinish;
         boolean gameOver;
+        int pendingRoundResult;
     }
 
     private static class TournamentState extends EndlessState {

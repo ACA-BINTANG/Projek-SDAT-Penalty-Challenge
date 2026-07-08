@@ -1,0 +1,15 @@
+Perubahan sensor keeper:
+
+1. Sensor keeper tidak lagi memakai kotak persegi penuh dari ImageView.
+2. Saat berdiri, sensor dibuat vertikal:
+   - KEEPER_STAND_SENSOR_WIDTH_RATIO
+   - KEEPER_STAND_SENSOR_HEIGHT_RATIO
+3. Saat lompat kiri/kanan, sensor dibuat horizontal:
+   - KEEPER_DIVE_SENSOR_WIDTH_RATIO
+   - KEEPER_DIVE_SENSOR_HEIGHT_RATIO
+4. Sensor saat lompat diberi offset ke arah lompatan:
+   - KEEPER_DIVE_SENSOR_X_OFFSET_RATIO
+   - KEEPER_DIVE_SENSOR_Y_OFFSET_RATIO
+5. Batas gerak keeper tidak lagi memakai KEEPER_SIZE / 2 yang terlalu membatasi.
+   Sekarang batasnya memakai KEEPER_EDGE_PADDING_RATIO supaya keeper bisa menjangkau ujung gawang.
+6. Jika ingin melihat sensor, ubah SHOW_DEBUG_BOXES menjadi true di Main.java.
