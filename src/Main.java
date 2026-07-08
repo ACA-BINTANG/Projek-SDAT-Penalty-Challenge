@@ -11,6 +11,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
@@ -21,6 +22,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
+import javafx.scene.effect.BlendMode;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
@@ -44,6 +46,8 @@ public class Main extends Application {
     private static final String MENU_BACKGROUND_PATH = "resources/images/Tampilan-BG-Menu.png";
     private static final String MENU_BOX_OFF_PATH = "resources/images/Box-Menu-off.png";
     private static final String MENU_BOX_ON_PATH = "resources/images/Box-Menu-on.png";
+    private static final String TOURNAMENT_BACKGROUND_PATH = "resources/images/Tampilan-BG-Turnament.png";
+    private static final String TOURNAMENT_BRACKET_PATH = "resources/images/Bagan-Tournament.png";
     private static final String GOAL_BACKGROUND_PATH = "resources/images/GAWANG.png";
     private static final String BALL_IMAGE_PATH = "resources/images/BOLA.png";
     private static final String KEEPER_IMAGE_PATH = "resources/images/KEEPER-01.png";
@@ -69,6 +73,18 @@ public class Main extends Application {
     private static final double GOAL_BOTTOM_RATIO = 0.65;
     private static final double GOAL_SCORE_LINE_RATIO = 0.30;
     private static final int MAX_PLAYER_LIVES = 3;
+    private static final int TOURNAMENT_SHOTS_PER_ROUND = 5;
+    private static final String[] TOURNAMENT_ROUNDS = {"QUARTER FINAL", "SEMI FINAL", "FINAL"};
+    private static final int[] TOURNAMENT_TARGETS = {2, 3, 4};
+    private static final String[] TOURNAMENT_OPPONENTS = {
+            "JAVA UNITED",
+            "PIXEL CITY",
+            "BYTE ROVERS",
+            "GARUDA FC",
+            "SDAT CLUB",
+            "CODE STRIKERS",
+            "IDEA ATHLETIC"
+    };
     private MediaPlayer introPlayer;
     private final Random random = new Random();
 
@@ -211,6 +227,8 @@ public class Main extends Application {
             StackPane option = createMenuOption(modes[i]);
             if ("ENDLESS".equals(modes[i])) {
                 option.setOnMouseClicked(event -> showEndlessMode(stage));
+            } else if ("TOURNAMENT".equals(modes[i])) {
+                option.setOnMouseClicked(event -> showTournamentMode(stage));
             }
             menuBox.getChildren().add(option);
         }
@@ -220,6 +238,7 @@ public class Main extends Application {
         Scene scene = new Scene(root, 1280, 720);
         stage.setScene(scene);
         stage.setFullScreen(true);
+        scene.setCursor(Cursor.DEFAULT);
     }
 
     private StackPane createMenuOption(String modeName) {
@@ -257,6 +276,22 @@ public class Main extends Application {
         Path path = Path.of(imagePath).toAbsolutePath().normalize();
         Image image = new Image(path.toUri().toString());
         return new ImageView(image);
+    }
+
+    private Button createNavigationButton(String text) {
+        Button button = new Button(text);
+        button.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+        button.setCursor(Cursor.HAND);
+        button.setMinWidth(86);
+        button.setPrefWidth(86);
+        button.setMinHeight(32);
+        button.setPrefHeight(32);
+        return button;
+    }
+
+    private void setImage(ImageView imageView, String imagePath) {
+        Path path = Path.of(imagePath).toAbsolutePath().normalize();
+        imageView.setImage(new Image(path.toUri().toString()));
     }
 
     private void showEndlessMode(Stage stage) {
@@ -349,6 +384,11 @@ public class Main extends Application {
         hintText.setLayoutX(32);
         hintText.setLayoutY(82);
 
+        Button endlessMenuButton = createNavigationButton("MENU");
+        endlessMenuButton.layoutXProperty().bind(root.widthProperty().subtract(118));
+        endlessMenuButton.setLayoutY(28);
+        endlessMenuButton.setOnAction(event -> showMenu(stage));
+
         Rectangle gameOverOverlay = new Rectangle();
         gameOverOverlay.widthProperty().bind(root.widthProperty());
         gameOverOverlay.heightProperty().bind(root.heightProperty());
@@ -420,6 +460,7 @@ public class Main extends Application {
                 livesText,
                 livesIndicatorBox,
                 hintText,
+                endlessMenuButton,
                 gameOverOverlay,
                 gameOverText,
                 saveScoreBox
@@ -429,6 +470,11 @@ public class Main extends Application {
         Scene scene = new Scene(root, 1280, 720);
         stage.setScene(scene);
         stage.setFullScreen(true);
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                showMenu(stage);
+            }
+        });
 
         EndlessState state = new EndlessState();
         state.lives = MAX_PLAYER_LIVES;
@@ -569,6 +615,876 @@ public class Main extends Application {
             }
         };
         gameLoop.start();
+    }
+
+    private void showTournamentMode(Stage stage) {
+        StackPane root = new StackPane();
+        Pane playLayer = new Pane();
+
+        ImageView background = createImageView(TOURNAMENT_BACKGROUND_PATH);
+        background.setPreserveRatio(false);
+        background.fitWidthProperty().bind(root.widthProperty());
+        background.fitHeightProperty().bind(root.heightProperty());
+
+        ImageView keeper = createImageView(KEEPER_IMAGE_PATH);
+        keeper.setFitWidth(KEEPER_SIZE);
+        keeper.setFitHeight(KEEPER_SIZE);
+        keeper.setPreserveRatio(true);
+
+        ImageView ball = createImageView(BALL_IMAGE_PATH);
+        ball.setFitWidth(BALL_SIZE);
+        ball.setFitHeight(BALL_SIZE);
+        ball.setPreserveRatio(true);
+        ball.setCursor(Cursor.HAND);
+
+        Line pullLine = new Line();
+        pullLine.setStroke(Color.rgb(255, 255, 255, 0.75));
+        pullLine.setStrokeWidth(4);
+        pullLine.setVisible(false);
+
+        Circle targetMarker = new Circle(8);
+        targetMarker.setFill(Color.rgb(255, 235, 95, 0.82));
+        targetMarker.setStroke(Color.rgb(255, 255, 255, 0.9));
+        targetMarker.setStrokeWidth(2);
+        targetMarker.setMouseTransparent(true);
+        targetMarker.setVisible(false);
+
+        Text roundText = new Text();
+        roundText.setFill(Color.WHITE);
+        roundText.setFont(loadFont(MENU_FONT_PATH, 28, Font.font("Arial", FontWeight.BOLD, 28)));
+        roundText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - roundText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                roundText.layoutBoundsProperty()
+        ));
+        roundText.setLayoutY(52);
+
+        Text targetText = new Text();
+        targetText.setFill(Color.WHITE);
+        targetText.setFont(loadFont(MENU_FONT_PATH, 20, Font.font("Arial", FontWeight.BOLD, 20)));
+        targetText.setLayoutX(32);
+        targetText.setLayoutY(48);
+
+        Text shotsText = new Text();
+        shotsText.setFill(Color.WHITE);
+        shotsText.setFont(loadFont(MENU_FONT_PATH, 20, Font.font("Arial", FontWeight.BOLD, 20)));
+        shotsText.setLayoutX(32);
+        shotsText.setLayoutY(78);
+
+        Text totalText = new Text();
+        totalText.setFill(Color.WHITE);
+        totalText.setFont(loadFont(MENU_FONT_PATH, 20, Font.font("Arial", FontWeight.BOLD, 20)));
+        totalText.layoutXProperty().bind(root.widthProperty().subtract(210));
+        totalText.setLayoutY(48);
+
+        Text hintText = new Text("Tarik bola, lalu lepas");
+        hintText.setFill(Color.rgb(255, 255, 255, 0.82));
+        hintText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
+        hintText.layoutXProperty().bind(root.widthProperty().subtract(250));
+        hintText.setLayoutY(78);
+
+        Button backToBracketButton = createNavigationButton("KEMBALI");
+        backToBracketButton.layoutXProperty().bind(root.widthProperty().subtract(118));
+        backToBracketButton.setLayoutY(104);
+        backToBracketButton.setVisible(false);
+
+        Rectangle resultOverlay = new Rectangle();
+        resultOverlay.widthProperty().bind(root.widthProperty());
+        resultOverlay.heightProperty().bind(root.heightProperty());
+        resultOverlay.setFill(Color.rgb(0, 0, 0, 0.62));
+        resultOverlay.setVisible(false);
+
+        Text resultTitle = new Text();
+        resultTitle.setFill(Color.WHITE);
+        resultTitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        resultTitle.setFont(loadFont(MENU_FONT_PATH, 40, Font.font("Arial", FontWeight.EXTRA_BOLD, 40)));
+        resultTitle.setMouseTransparent(true);
+
+        Text resultDetail = new Text();
+        resultDetail.setFill(Color.rgb(255, 230, 120));
+        resultDetail.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        resultDetail.setFont(loadFont(MENU_FONT_PATH, 19, Font.font("Arial", FontWeight.BOLD, 19)));
+        resultDetail.setMouseTransparent(true);
+
+        Button primaryButton = new Button("LANJUT");
+        Button menuButton = new Button("MENU");
+        primaryButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        menuButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        primaryButton.setCursor(Cursor.HAND);
+        menuButton.setCursor(Cursor.HAND);
+
+        HBox resultButtons = new HBox(12, primaryButton, menuButton);
+        resultButtons.setAlignment(Pos.CENTER);
+
+        VBox resultBox = new VBox(14, resultTitle, resultDetail, resultButtons);
+        resultBox.setAlignment(Pos.CENTER);
+        resultBox.setPadding(new Insets(18));
+        resultBox.setBackground(new Background(new BackgroundFill(Color.rgb(0, 0, 0, 0.72), new CornerRadii(8), Insets.EMPTY)));
+        resultBox.setMaxWidth(470);
+        resultBox.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - resultBox.getBoundsInLocal().getWidth()) / 2,
+                root.widthProperty(),
+                resultBox.boundsInLocalProperty()
+        ));
+        resultBox.layoutYProperty().bind(root.heightProperty().multiply(0.42));
+        resultBox.setVisible(false);
+
+        Label[] bracketLabels = new Label[15];
+        StackPane bracketOverlay = createTournamentBracketOverlay(bracketLabels);
+        bracketOverlay.prefWidthProperty().bind(root.widthProperty());
+        bracketOverlay.prefHeightProperty().bind(root.heightProperty());
+        Button startMatchButton = (Button) bracketOverlay.getProperties().get("startMatchButton");
+        Button bracketMenuButton = (Button) bracketOverlay.getProperties().get("menuButton");
+        Button fourTeamButton = (Button) bracketOverlay.getProperties().get("fourTeamButton");
+        Button eightTeamButton = (Button) bracketOverlay.getProperties().get("eightTeamButton");
+        TextField teamNameInput = (TextField) bracketOverlay.getProperties().get("teamNameInput");
+        Text setupStatusText = (Text) bracketOverlay.getProperties().get("setupStatusText");
+        StackPane bracketHolder = (StackPane) bracketOverlay.getProperties().get("bracketHolder");
+        Runnable unlockTournamentSetup = () -> {
+            teamNameInput.setDisable(false);
+            fourTeamButton.setDisable(false);
+            eightTeamButton.setDisable(false);
+        };
+        Runnable lockTournamentSetup = () -> {
+            teamNameInput.setDisable(true);
+            fourTeamButton.setDisable(true);
+            eightTeamButton.setDisable(true);
+        };
+
+        playLayer.getChildren().addAll(
+                pullLine,
+                targetMarker,
+                keeper,
+                ball,
+                roundText,
+                targetText,
+                shotsText,
+                totalText,
+                hintText,
+                backToBracketButton,
+                resultOverlay,
+                resultBox,
+                bracketOverlay
+        );
+        root.getChildren().addAll(background, playLayer);
+
+        Scene scene = new Scene(root, 1280, 720);
+        stage.setScene(scene);
+        stage.setFullScreen(true);
+        ball.setCursor(Cursor.DEFAULT);
+        setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
+
+        TournamentState state = new TournamentState();
+        state.teamCount = 8;
+        state.playerTeamName = "PLAYER FC";
+        state.opponents = createTournamentOpponents(state.teamCount);
+        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state);
+        Runnable refreshUi = () -> {
+            updateTournamentTexts(roundText, targetText, shotsText, totalText, state);
+            updateTournamentBracketLabels(bracketLabels, state);
+        };
+        Runnable backToBracket = () -> {
+            state.ballMoving = false;
+            state.dragging = false;
+            state.keeperMoving = false;
+            pullLine.setVisible(false);
+            targetMarker.setVisible(false);
+            setImage(background, TOURNAMENT_BACKGROUND_PATH);
+            bracketOverlay.setVisible(true);
+            backToBracketButton.setVisible(false);
+            setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
+            ball.setCursor(Cursor.DEFAULT);
+            refreshUi.run();
+            resetRound.run();
+        };
+        Runnable restartTournament = () -> {
+            state.roundIndex = 0;
+            state.roundGoals = 0;
+            state.shotsTaken = 0;
+            state.totalGoals = 0;
+            state.scoredShotsLearned = 0;
+            state.gameOver = false;
+            state.roundFinished = false;
+            state.eliminated = false;
+            state.champion = false;
+            state.setupDone = false;
+            state.opponents = createTournamentOpponents(state.teamCount);
+            teamNameInput.setText(state.playerTeamName);
+            setupStatusText.setText("Isi nama tim, pilih jumlah tim, lalu mulai");
+            startMatchButton.setText("MULAI");
+            unlockTournamentSetup.run();
+            ball.setCursor(Cursor.DEFAULT);
+            resultOverlay.setVisible(false);
+            resultBox.setVisible(false);
+            setImage(background, TOURNAMENT_BACKGROUND_PATH);
+            bracketOverlay.setVisible(true);
+            backToBracketButton.setVisible(false);
+            setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
+            refreshUi.run();
+            resetRound.run();
+        };
+
+        root.widthProperty().addListener((observable, oldValue, newValue) -> resetRound.run());
+        root.heightProperty().addListener((observable, oldValue, newValue) -> resetRound.run());
+        teamNameInput.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!state.setupDone) {
+                state.playerTeamName = cleanTeamName(newValue);
+                refreshUi.run();
+            }
+        });
+        Platform.runLater(() -> {
+            refreshUi.run();
+            resetRound.run();
+        });
+
+        primaryButton.setOnAction(event -> {
+            if (state.champion || state.eliminated) {
+                restartTournament.run();
+                return;
+            }
+
+            state.roundIndex++;
+            state.roundGoals = 0;
+            state.shotsTaken = 0;
+            state.roundFinished = false;
+            resultOverlay.setVisible(false);
+            resultBox.setVisible(false);
+            setImage(background, TOURNAMENT_BACKGROUND_PATH);
+            bracketOverlay.setVisible(true);
+            backToBracketButton.setVisible(false);
+            setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
+            ball.setCursor(Cursor.DEFAULT);
+            refreshUi.run();
+            resetRound.run();
+        });
+        menuButton.setOnAction(event -> showMenu(stage));
+        backToBracketButton.setOnAction(event -> backToBracket.run());
+        fourTeamButton.setOnAction(event -> {
+            state.teamCount = 4;
+            state.opponents = createTournamentOpponents(state.teamCount);
+            rebuildTournamentBracketBoard(bracketHolder, bracketLabels, state.teamCount);
+            setupStatusText.setText("Turnamen 4 tim dipilih");
+            refreshUi.run();
+        });
+        eightTeamButton.setOnAction(event -> {
+            state.teamCount = 8;
+            state.opponents = createTournamentOpponents(state.teamCount);
+            rebuildTournamentBracketBoard(bracketHolder, bracketLabels, state.teamCount);
+            setupStatusText.setText("Turnamen 8 tim dipilih");
+            refreshUi.run();
+        });
+        startMatchButton.setOnAction(event -> {
+            if (state.champion || state.eliminated) {
+                startMatchButton.setText("MULAI");
+                restartTournament.run();
+                return;
+            }
+            if (!state.setupDone) {
+                String teamName = teamNameInput.getText().trim();
+                if (teamName.isEmpty()) {
+                    setupStatusText.setText("Nama tim harus diisi");
+                    return;
+                }
+                state.playerTeamName = cleanTeamName(teamName);
+                state.roundIndex = 0;
+                state.roundGoals = 0;
+                state.shotsTaken = 0;
+                state.totalGoals = 0;
+                state.scoredShotsLearned = 0;
+                state.eliminated = false;
+                state.champion = false;
+                state.setupDone = true;
+                lockTournamentSetup.run();
+                refreshUi.run();
+            }
+            setImage(background, GOAL_BACKGROUND_PATH);
+            bracketOverlay.setVisible(false);
+            backToBracketButton.setVisible(true);
+            setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, true);
+            ball.setCursor(Cursor.HAND);
+            resetRound.run();
+        });
+        bracketMenuButton.setOnAction(event -> showMenu(stage));
+
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                if (bracketOverlay.isVisible()) {
+                    showMenu(stage);
+                } else {
+                    backToBracket.run();
+                }
+            }
+        });
+
+        ball.setOnMousePressed(event -> {
+            if (bracketOverlay.isVisible() || state.gameOver || state.roundFinished || state.ballMoving) {
+                return;
+            }
+            state.dragging = true;
+            state.anchorX = getCenterX(ball);
+            state.anchorY = getCenterY(ball);
+            pullLine.setStartX(state.anchorX);
+            pullLine.setStartY(state.anchorY);
+            pullLine.setEndX(state.anchorX);
+            pullLine.setEndY(state.anchorY);
+            pullLine.setVisible(true);
+            targetMarker.setVisible(false);
+        });
+
+        ball.setOnMouseDragged(event -> {
+            if (bracketOverlay.isVisible() || state.gameOver || state.roundFinished || !state.dragging || state.ballMoving) {
+                return;
+            }
+
+            double mouseX = event.getSceneX();
+            double mouseY = event.getSceneY();
+            double dx = mouseX - state.anchorX;
+            double dy = mouseY - state.anchorY;
+            double distance = Math.hypot(dx, dy);
+            if (distance > MAX_PULL_DISTANCE) {
+                dx = dx / distance * MAX_PULL_DISTANCE;
+                dy = dy / distance * MAX_PULL_DISTANCE;
+            }
+
+            setCenter(ball, state.anchorX + dx, state.anchorY + dy);
+            pullLine.setEndX(getCenterX(ball));
+            pullLine.setEndY(getCenterY(ball));
+            updateTargetMarker(root, ball, targetMarker, state);
+        });
+
+        ball.setOnMouseReleased(event -> {
+            if (bracketOverlay.isVisible() || state.gameOver || state.roundFinished || !state.dragging || state.ballMoving) {
+                return;
+            }
+
+            state.dragging = false;
+            pullLine.setVisible(false);
+            targetMarker.setVisible(false);
+            applyKickForce(root, ball, state);
+            if (state.shotSpeed < MIN_BALL_SPEED + 20) {
+                registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+                return;
+            }
+
+            state.ballMoving = true;
+            state.keeperMoving = true;
+            chooseKeeperTarget(root, state);
+        });
+
+        AnimationTimer gameLoop = new AnimationTimer() {
+            private long lastFrameTime = 0;
+
+            @Override
+            public void handle(long now) {
+                if (lastFrameTime == 0) {
+                    lastFrameTime = now;
+                    return;
+                }
+
+                double deltaSeconds = (now - lastFrameTime) / 1_000_000_000.0;
+                lastFrameTime = now;
+                updateTournament(
+                        root,
+                        ball,
+                        keeper,
+                        resultOverlay,
+                        resultBox,
+                        resultTitle,
+                        resultDetail,
+                        primaryButton,
+                        background,
+                        bracketOverlay,
+                        startMatchButton,
+                        bracketLabels,
+                        state,
+                        refreshUi,
+                        resetRound,
+                        deltaSeconds
+                );
+            }
+        };
+        gameLoop.start();
+    }
+
+    private StackPane createTournamentBracketOverlay(Label[] bracketLabels) {
+        Rectangle dim = new Rectangle();
+        dim.setFill(Color.rgb(0, 0, 0, 0.18));
+
+        Text title = new Text("BAGAN TIM");
+        title.setFill(Color.WHITE);
+        title.setFont(loadFont(MENU_FONT_PATH, 34, Font.font("Arial", FontWeight.EXTRA_BOLD, 34)));
+
+        TextField teamNameInput = new TextField("PLAYER FC");
+        teamNameInput.setPromptText("Nama tim kamu");
+        teamNameInput.setMaxWidth(260);
+        teamNameInput.setFont(Font.font("Arial", FontWeight.BOLD, 15));
+
+        Button fourTeamButton = new Button("4 TIM");
+        Button eightTeamButton = new Button("8 TIM");
+        fourTeamButton.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+        eightTeamButton.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+        fourTeamButton.setCursor(Cursor.HAND);
+        eightTeamButton.setCursor(Cursor.HAND);
+
+        HBox teamCountBox = new HBox(10, fourTeamButton, eightTeamButton);
+        teamCountBox.setAlignment(Pos.CENTER);
+
+        Text setupStatusText = new Text("Isi nama tim, pilih jumlah tim, lalu mulai");
+        setupStatusText.setFill(Color.rgb(255, 230, 120));
+        setupStatusText.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+
+        VBox setupBox = new VBox(8, teamNameInput, teamCountBox, setupStatusText);
+        setupBox.setAlignment(Pos.CENTER);
+
+        StackPane bracketHolder = new StackPane();
+        rebuildTournamentBracketBoard(bracketHolder, bracketLabels, 8);
+
+        Button startMatchButton = new Button("MULAI");
+        Button menuButton = new Button("MENU");
+        startMatchButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        menuButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        startMatchButton.setCursor(Cursor.HAND);
+        menuButton.setCursor(Cursor.HAND);
+
+        HBox actions = new HBox(12, startMatchButton, menuButton);
+        actions.setAlignment(Pos.CENTER);
+
+        VBox content = new VBox(14, title, setupBox, bracketHolder, actions);
+        content.setAlignment(Pos.CENTER);
+        content.setPadding(new Insets(24));
+        content.setBackground(new Background(new BackgroundFill(Color.TRANSPARENT, CornerRadii.EMPTY, Insets.EMPTY)));
+        content.setMaxWidth(1020);
+
+        StackPane overlay = new StackPane(dim, content);
+        dim.widthProperty().bind(overlay.widthProperty());
+        dim.heightProperty().bind(overlay.heightProperty());
+        overlay.setVisible(true);
+        overlay.getProperties().put("startMatchButton", startMatchButton);
+        overlay.getProperties().put("menuButton", menuButton);
+        overlay.getProperties().put("fourTeamButton", fourTeamButton);
+        overlay.getProperties().put("eightTeamButton", eightTeamButton);
+        overlay.getProperties().put("teamNameInput", teamNameInput);
+        overlay.getProperties().put("setupStatusText", setupStatusText);
+        overlay.getProperties().put("bracketHolder", bracketHolder);
+        return overlay;
+    }
+
+    private void rebuildTournamentBracketBoard(StackPane bracketHolder, Label[] bracketLabels, int teamCount) {
+        for (int i = 0; i < bracketLabels.length; i++) {
+            bracketLabels[i] = null;
+        }
+        bracketHolder.getChildren().setAll(teamCount <= 4
+                ? createFourTeamBracketBoard(bracketLabels)
+                : createEightTeamBracketBoard(bracketLabels));
+    }
+
+    private StackPane createEightTeamBracketBoard(Label[] bracketLabels) {
+        double boardWidth = 920;
+        double boardHeight = 517.5;
+        double scaleX = boardWidth / 1600.0;
+        double scaleY = boardHeight / 900.0;
+
+        ImageView bracketImage = createImageView(TOURNAMENT_BRACKET_PATH);
+        bracketImage.setPreserveRatio(false);
+        bracketImage.setFitWidth(boardWidth);
+        bracketImage.setFitHeight(boardHeight);
+        bracketImage.setBlendMode(BlendMode.SCREEN);
+
+        Pane labels = new Pane();
+        labels.setPrefSize(boardWidth, boardHeight);
+        labels.setMinSize(boardWidth, boardHeight);
+        labels.setMaxSize(boardWidth, boardHeight);
+        labels.setMouseTransparent(true);
+
+        double[][] labelPositions = {
+                {204, 223}, {204, 367}, {204, 545}, {204, 689},
+                {1397, 223}, {1397, 367}, {1397, 545}, {1397, 689},
+                {514, 299}, {1085, 299}, {514, 624}, {1085, 624},
+                {650, 450}, {950, 450}, {800, 450}
+        };
+
+        double[] widths = {128, 128, 128, 128, 128, 128, 128, 128, 95, 95, 95, 95, 150, 150, 178};
+        for (int i = 0; i < bracketLabels.length && i < labelPositions.length; i++) {
+            double labelWidth = widths[i];
+            Label label = createBracketLabel(labelWidth);
+            double centerX = labelPositions[i][0] * scaleX;
+            double centerY = labelPositions[i][1] * scaleY;
+            label.setLayoutX(centerX - labelWidth / 2);
+            label.setLayoutY(centerY - 10);
+            bracketLabels[i] = label;
+            labels.getChildren().add(label);
+        }
+
+        StackPane board = new StackPane(bracketImage, labels);
+        board.setMinSize(boardWidth, boardHeight);
+        board.setMaxSize(boardWidth, boardHeight);
+        return board;
+    }
+
+    private Pane createFourTeamBracketBoard(Label[] bracketLabels) {
+        double boardWidth = 920;
+        double boardHeight = 430;
+        Pane board = new Pane();
+        board.setMinSize(boardWidth, boardHeight);
+        board.setPrefSize(boardWidth, boardHeight);
+        board.setMaxSize(boardWidth, boardHeight);
+        board.setBackground(new Background(new BackgroundFill(Color.TRANSPARENT, CornerRadii.EMPTY, Insets.EMPTY)));
+
+        addBracketLine(board, 250, 132, 360, 132);
+        addBracketLine(board, 250, 292, 360, 292);
+        addBracketLine(board, 360, 132, 360, 292);
+        addBracketLine(board, 360, 212, 475, 212);
+        addBracketLine(board, 670, 212, 560, 212);
+
+        addBracketSlot(board, bracketLabels, 8, 70, 100, 180, 64, false);
+        addBracketSlot(board, bracketLabels, 10, 70, 260, 180, 64, false);
+        addBracketSlot(board, bracketLabels, 12, 475, 180, 185, 64, false);
+        addBracketSlot(board, bracketLabels, 13, 670, 180, 180, 64, false);
+        addBracketSlot(board, bracketLabels, 14, 365, 28, 190, 64, true);
+
+        return board;
+    }
+
+    private void addBracketLine(Pane board, double startX, double startY, double endX, double endY) {
+        Line line = new Line(startX, startY, endX, endY);
+        line.setStroke(Color.WHITE);
+        line.setStrokeWidth(4);
+        board.getChildren().add(line);
+    }
+
+    private void addBracketSlot(Pane board, Label[] bracketLabels, int index, double x, double y, double width, double height, boolean championSlot) {
+        Rectangle frame = new Rectangle(width, height);
+        frame.setLayoutX(x);
+        frame.setLayoutY(y);
+        frame.setArcWidth(14);
+        frame.setArcHeight(14);
+        frame.setFill(Color.rgb(9, 17, 23, 0.38));
+        frame.setStroke(championSlot ? Color.rgb(255, 188, 42) : Color.WHITE);
+        frame.setStrokeWidth(4);
+
+        Label label = createBracketLabel(width - 20);
+        label.setLayoutX(x + 10);
+        label.setLayoutY(y + (height - 24) / 2);
+        bracketLabels[index] = label;
+
+        board.getChildren().addAll(frame, label);
+    }
+
+    private Label createBracketLabel(double width) {
+        Label label = new Label("");
+        label.setTextFill(Color.WHITE);
+        label.setFont(loadFont(MENU_FONT_PATH, 10, Font.font("Arial", FontWeight.BOLD, 10)));
+        label.setAlignment(Pos.CENTER);
+        label.setMinWidth(width);
+        label.setPrefWidth(width);
+        label.setMaxWidth(width);
+        label.setMinHeight(24);
+        label.setPrefHeight(24);
+        label.setMaxHeight(24);
+        label.setMouseTransparent(true);
+        return label;
+    }
+
+    private void updateTournamentBracketLabels(Label[] bracketLabels, TournamentState state) {
+        for (int i = 0; i < bracketLabels.length; i++) {
+            setBracketLabel(bracketLabels, i, "", false);
+        }
+
+        String playerTeam = state.playerTeamName != null && !state.playerTeamName.isEmpty()
+                ? state.playerTeamName
+                : "PLAYER FC";
+
+        if (state.teamCount <= 4) {
+            setBracketLabel(bracketLabels, 8, playerTeam, true);
+            if (state.setupDone) {
+                setBracketLabel(bracketLabels, 10, getTournamentOpponent(state, 0), false);
+            }
+            if (state.roundIndex > 0 || state.champion) {
+                setBracketLabel(bracketLabels, 12, playerTeam, true);
+                setBracketLabel(bracketLabels, 13, getTournamentOpponent(state, 1), false);
+            }
+        } else {
+            setBracketLabel(bracketLabels, 0, playerTeam, true);
+            if (state.setupDone) {
+                setBracketLabel(bracketLabels, 1, getTournamentOpponent(state, 0), false);
+            }
+            if (state.roundIndex > 0 || state.champion) {
+                setBracketLabel(bracketLabels, 8, playerTeam, true);
+                setBracketLabel(bracketLabels, 10, getTournamentOpponent(state, 1), false);
+            }
+            if (state.roundIndex > 1 || state.champion) {
+                setBracketLabel(bracketLabels, 12, playerTeam, true);
+                setBracketLabel(bracketLabels, 13, getTournamentOpponent(state, 2), false);
+            }
+        }
+
+        if (state.champion) {
+            setBracketLabel(bracketLabels, 14, playerTeam, true);
+        }
+
+        if (state.eliminated) {
+            setBracketLabel(bracketLabels, 14, "TERHENTI", false);
+        }
+    }
+
+    private void setTournamentPlayObjectsVisible(
+            ImageView ball,
+            ImageView keeper,
+            Line pullLine,
+            Circle targetMarker,
+            boolean visible
+    ) {
+        if (ball != null) {
+            ball.setVisible(visible);
+        }
+        if (keeper != null) {
+            keeper.setVisible(visible);
+        }
+        if (pullLine != null) {
+            pullLine.setVisible(false);
+        }
+        if (targetMarker != null) {
+            targetMarker.setVisible(false);
+        }
+    }
+
+    private void setBracketLabel(Label[] bracketLabels, int index, String value, boolean playerTeam) {
+        if (bracketLabels[index] == null) {
+            return;
+        }
+        bracketLabels[index].setText(shortenBracketName(value));
+        bracketLabels[index].setTextFill(playerTeam ? Color.rgb(75, 210, 255) : Color.WHITE);
+    }
+
+    private String shortenBracketName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String cleanValue = value.trim();
+        if (cleanValue.length() > 13) {
+            return cleanValue.substring(0, 13);
+        }
+        return cleanValue;
+    }
+
+    private int getTournamentRoundCount(TournamentState state) {
+        return state.teamCount <= 4 ? 2 : 3;
+    }
+
+    private String getTournamentRoundName(TournamentState state) {
+        int roundOffset = state.teamCount <= 4 ? 1 : 0;
+        int roundIndex = clampInt(state.roundIndex + roundOffset, 0, TOURNAMENT_ROUNDS.length - 1);
+        return TOURNAMENT_ROUNDS[roundIndex];
+    }
+
+    private int getTournamentTarget(TournamentState state) {
+        int roundOffset = state.teamCount <= 4 ? 1 : 0;
+        int targetIndex = clampInt(state.roundIndex + roundOffset, 0, TOURNAMENT_TARGETS.length - 1);
+        return TOURNAMENT_TARGETS[targetIndex];
+    }
+
+    private String[] createTournamentOpponents(int teamCount) {
+        int opponentCount = Math.max(1, Math.min(teamCount - 1, TOURNAMENT_OPPONENTS.length));
+        String[] opponents = new String[opponentCount];
+        boolean[] used = new boolean[TOURNAMENT_OPPONENTS.length];
+        for (int i = 0; i < opponents.length; i++) {
+            int candidate = random.nextInt(TOURNAMENT_OPPONENTS.length);
+            while (used[candidate]) {
+                candidate = (candidate + 1) % TOURNAMENT_OPPONENTS.length;
+            }
+            used[candidate] = true;
+            opponents[i] = TOURNAMENT_OPPONENTS[candidate];
+        }
+        return opponents;
+    }
+
+    private String getTournamentOpponent(TournamentState state, int roundIndex) {
+        if (state.opponents == null || roundIndex < 0 || roundIndex >= state.opponents.length) {
+            return "TBD";
+        }
+        return state.opponents[roundIndex];
+    }
+
+    private String cleanTeamName(String teamName) {
+        if (teamName == null) {
+            return "";
+        }
+        String cleanName = teamName.replace("\t", " ").replace("\r", " ").replace("\n", " ").trim();
+        if (cleanName.length() > 16) {
+            return cleanName.substring(0, 16);
+        }
+        return cleanName;
+    }
+
+    private int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private void updateTournament(
+            StackPane root,
+            ImageView ball,
+            ImageView keeper,
+            Rectangle resultOverlay,
+            VBox resultBox,
+            Text resultTitle,
+            Text resultDetail,
+            Button primaryButton,
+            ImageView background,
+            StackPane bracketOverlay,
+            Button startMatchButton,
+            Label[] bracketLabels,
+            TournamentState state,
+            Runnable refreshUi,
+            Runnable resetRound,
+            double deltaSeconds
+    ) {
+        if (state.gameOver || state.roundFinished) {
+            return;
+        }
+
+        if (state.keeperMoving) {
+            double keeperCenterX = getCenterX(keeper);
+            double keeperCenterY = getCenterY(keeper);
+            double dx = state.keeperTargetX - keeperCenterX;
+            double dy = state.keeperTargetY - keeperCenterY;
+            double distance = Math.hypot(dx, dy);
+            double step = (540 + state.roundIndex * 45) * deltaSeconds;
+            if (distance <= step) {
+                setCenter(keeper, state.keeperTargetX, state.keeperTargetY);
+                state.keeperMoving = false;
+            } else {
+                setCenter(keeper, keeperCenterX + dx / distance * step, keeperCenterY + dy / distance * step);
+            }
+        }
+
+        if (!state.ballMoving) {
+            return;
+        }
+
+        double ballCenterX = getCenterX(ball);
+        double ballCenterY = getCenterY(ball);
+        double distanceToTarget = Math.hypot(state.targetX - ballCenterX, state.targetY - ballCenterY);
+        double step = state.shotSpeed * deltaSeconds;
+        boolean reachedTarget = distanceToTarget <= step;
+        if (reachedTarget) {
+            setCenter(ball, state.targetX, state.targetY);
+        } else {
+            setCenter(
+                    ball,
+                    ballCenterX + (state.targetX - ballCenterX) / distanceToTarget * step,
+                    ballCenterY + (state.targetY - ballCenterY) / distanceToTarget * step
+            );
+        }
+
+        if (reachedTarget && isShotSavedByKeeper(root, keeper, state)) {
+            registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+            return;
+        }
+
+        double width = root.getWidth();
+        double height = root.getHeight();
+        if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            rememberScoredShot(state);
+            registerTournamentShot(true, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+            return;
+        }
+
+        boolean outsideScreen = getCenterX(ball) < -80
+                || getCenterX(ball) > width + 80
+                || getCenterY(ball) < -80
+                || getCenterY(ball) > height + 80;
+        if (outsideScreen || reachedTarget) {
+            registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
+        }
+    }
+
+    private void registerTournamentShot(
+            boolean goal,
+            ImageView ball,
+            ImageView keeper,
+            TournamentState state,
+            Rectangle resultOverlay,
+            VBox resultBox,
+            Text resultTitle,
+            Text resultDetail,
+            Button primaryButton,
+            ImageView background,
+            StackPane bracketOverlay,
+            Button startMatchButton,
+            Label[] bracketLabels,
+            Runnable refreshUi,
+            Runnable resetRound
+    ) {
+        state.ballMoving = false;
+        state.dragging = false;
+        state.keeperMoving = false;
+        state.shotsTaken++;
+
+        if (goal) {
+            state.roundGoals++;
+            state.totalGoals++;
+            state.score = state.totalGoals;
+        }
+
+        refreshUi.run();
+
+        int target = getTournamentTarget(state);
+        int shotsLeft = TOURNAMENT_SHOTS_PER_ROUND - state.shotsTaken;
+        boolean impossibleToQualify = state.roundGoals + shotsLeft < target;
+        boolean targetReached = state.roundGoals >= target;
+        boolean shotsFinished = state.shotsTaken >= TOURNAMENT_SHOTS_PER_ROUND;
+
+        if (targetReached) {
+            state.roundFinished = true;
+            boolean finalRound = state.roundIndex == getTournamentRoundCount(state) - 1;
+            state.champion = finalRound;
+            state.eliminated = false;
+            updateTournamentBracketLabels(bracketLabels, state);
+            setImage(background, TOURNAMENT_BACKGROUND_PATH);
+            resultTitle.setText(finalRound ? "JUARA TURNAMEN" : "RONDE LOLOS");
+            resultDetail.setText(getTournamentRoundName(state) + "\nGol: " + state.roundGoals + "/" + TOURNAMENT_SHOTS_PER_ROUND
+                    + "\nTotal gol: " + state.totalGoals);
+            primaryButton.setText(finalRound ? "ULANGI" : "LANJUT");
+            ball.setCursor(Cursor.DEFAULT);
+            if (finalRound) {
+                startMatchButton.setText("ULANGI");
+                resultOverlay.setVisible(false);
+                resultBox.setVisible(false);
+                setTournamentPlayObjectsVisible(ball, keeper, null, null, false);
+                bracketOverlay.setVisible(true);
+            } else {
+                resultOverlay.setVisible(true);
+                resultBox.setVisible(true);
+            }
+            return;
+        }
+
+        if (impossibleToQualify || shotsFinished) {
+            state.roundFinished = true;
+            state.eliminated = true;
+            state.champion = false;
+            updateTournamentBracketLabels(bracketLabels, state);
+            setImage(background, TOURNAMENT_BACKGROUND_PATH);
+            resultTitle.setText("ELIMINASI");
+            resultDetail.setText(getTournamentRoundName(state) + "\nTarget: " + target
+                    + " gol\nGol kamu: " + state.roundGoals + "\nTotal gol: " + state.totalGoals);
+            primaryButton.setText("ULANGI");
+            ball.setCursor(Cursor.DEFAULT);
+            resultOverlay.setVisible(true);
+            resultBox.setVisible(true);
+            return;
+        }
+
+        resetRound.run();
+    }
+
+    private void updateTournamentTexts(Text roundText, Text targetText, Text shotsText, Text totalText, TournamentState state) {
+        int target = getTournamentTarget(state);
+        int shotsLeft = TOURNAMENT_SHOTS_PER_ROUND - state.shotsTaken;
+        roundText.setText(getTournamentRoundName(state));
+        targetText.setText("TARGET: " + state.roundGoals + "/" + target);
+        shotsText.setText("SISA SHOT: " + shotsLeft);
+        totalText.setText("TOTAL: " + state.totalGoals);
     }
 
     private void updateEndless(
@@ -928,25 +1844,39 @@ public class Main extends Application {
     }
 
     private static class EndlessState {
-        private boolean dragging;
-        private boolean ballMoving;
-        private boolean keeperMoving;
-        private boolean keeperJumping;
-        private double anchorX;
-        private double anchorY;
-        private double velocityX;
-        private double velocityY;
-        private double targetX;
-        private double targetY;
-        private double shotSpeed;
-        private double keeperTargetX;
-        private double keeperTargetY;
-        private double learnedTargetX;
-        private double learnedTargetY;
-        private int scoredShotsLearned;
-        private int score;
-        private int lives;
-        private boolean gameOver;
+        boolean dragging;
+        boolean ballMoving;
+        boolean keeperMoving;
+        boolean keeperJumping;
+        double anchorX;
+        double anchorY;
+        double velocityX;
+        double velocityY;
+        double targetX;
+        double targetY;
+        double shotSpeed;
+        double keeperTargetX;
+        double keeperTargetY;
+        double learnedTargetX;
+        double learnedTargetY;
+        int scoredShotsLearned;
+        int score;
+        int lives;
+        boolean gameOver;
+    }
+
+    private static class TournamentState extends EndlessState {
+        int roundIndex;
+        int roundGoals;
+        int shotsTaken;
+        int totalGoals;
+        int teamCount;
+        String playerTeamName;
+        String[] opponents;
+        boolean setupDone;
+        boolean roundFinished;
+        boolean eliminated;
+        boolean champion;
     }
 
     private void showError(StackPane root, String message) {
