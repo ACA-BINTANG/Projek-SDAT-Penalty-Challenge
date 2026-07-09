@@ -114,6 +114,11 @@ public class Main extends Application {
     private static final double RETRO_PIXEL_SNAP = 4.0;
     private static final double BALL_RETRO_ROTATION_DEGREES_PER_SECOND = 720.0;
     private static final double BALL_ROTATION_SNAP_DEGREES = 22.5;
+    private static final double BALL_MIN_PERSPECTIVE_SCALE = 0.62;
+    private static final double BALL_PERSPECTIVE_CURVE = 1.18;
+    private static final double GOAL_TEXT_DURATION_SECONDS = 1.55;
+    private static final double GOAL_TEXT_POP_SECONDS = 0.22;
+    private static final double GOAL_TEXT_FADE_OUT_SECONDS = 0.45;
     private static final double KEEPER_START_CENTER_Y_RATIO = 0.56;
     private static final double KEEPER_GROUND_TARGET_Y_RATIO = 0.56;
     private static final double KEEPER_FALL_FORWARD_OFFSET_RATIO = 0.030;
@@ -218,7 +223,7 @@ public class Main extends Application {
         launch(args);
     }
 
-    private Path resolveResource(String relativePath) {
+private Path resolveResource(String relativePath) {
         Path cleanPath = Path.of(relativePath.replace("/", java.io.File.separator)).normalize();
 
         Path[] candidates = new Path[] {
@@ -491,7 +496,7 @@ public class Main extends Application {
         return new ImageView(image);
     }
 
-    private Image createFallbackImage() {
+private Image createFallbackImage() {
         javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(64, 64);
         javafx.scene.canvas.GraphicsContext graphics = canvas.getGraphicsContext2D();
         graphics.setFill(Color.rgb(40, 40, 40));
@@ -609,6 +614,8 @@ public class Main extends Application {
         hintText.setLayoutX(32);
         hintText.setLayoutY(82);
 
+        Text goalText = createGoalText(root);
+
         Button endlessMenuButton = createNavigationButton("MENU");
         endlessMenuButton.layoutXProperty().bind(root.widthProperty().subtract(118));
         endlessMenuButton.setLayoutY(28);
@@ -681,6 +688,7 @@ public class Main extends Application {
                 targetMarker,
                 keeper,
                 ball,
+                goalText,
                 scoreText,
                 livesText,
                 livesIndicatorBox,
@@ -828,6 +836,7 @@ public class Main extends Application {
                         keeper,
                         keeperAnimator,
                         keeperBoxOverlay,
+                        goalText,
                         scoreText,
                         livesText,
                         lifeIndicators,
@@ -962,6 +971,7 @@ public class Main extends Application {
 
         Text playerOneTag = createMultiplayerPlayerTag("PLAYER 1", Color.rgb(235, 55, 55));
         Text playerTwoTag = createMultiplayerPlayerTag("PLAYER 2", Color.rgb(70, 170, 255));
+        Text goalText = createGoalText(root);
 
         Rectangle resultOverlay = new Rectangle();
         resultOverlay.widthProperty().bind(root.widthProperty());
@@ -1008,6 +1018,7 @@ public class Main extends Application {
                 shortcutText,
                 playerOneTag,
                 playerTwoTag,
+                goalText,
                 roleText,
                 hintText,
                 resultOverlay,
@@ -1182,6 +1193,7 @@ public class Main extends Application {
                         keeper,
                         keeperAnimator,
                         keeperBoxOverlay,
+                        goalText,
                         roleText,
                         scoreText,
                         shotText,
@@ -1269,6 +1281,8 @@ public class Main extends Application {
         hintText.layoutXProperty().bind(root.widthProperty().subtract(250));
         hintText.setLayoutY(78);
 
+        Text goalText = createGoalText(root);
+
         Button backToBracketButton = createNavigationButton("KEMBALI");
         backToBracketButton.layoutXProperty().bind(root.widthProperty().subtract(118));
         backToBracketButton.setLayoutY(104);
@@ -1342,6 +1356,7 @@ public class Main extends Application {
                 targetMarker,
                 keeper,
                 ball,
+                goalText,
                 roundText,
                 targetText,
                 shotsText,
@@ -1575,6 +1590,7 @@ public class Main extends Application {
                         ball,
                         keeper,
                         keeperAnimator,
+                        goalText,
                         resultOverlay,
                         resultBox,
                         resultTitle,
@@ -1941,6 +1957,7 @@ public class Main extends Application {
         state.pendingRoundResult = ROUND_RESULT_NONE;
         state.roundResult = ROUND_RESULT_NONE;
         state.roundResolveTimer = 0;
+        state.goalTextTimerSeconds = 0;
         state.keeperFallElapsedSeconds = 0;
         state.keeperMoveElapsedSeconds = 0;
         state.keeperMoveDurationSeconds = 0;
@@ -1960,6 +1977,7 @@ public class Main extends Application {
 
         ball.setVisible(true);
         ball.setRotate(0);
+        resetBallPerspective(ball);
         ball.setCursor(state.gameOver ? Cursor.DEFAULT : Cursor.HAND);
         setCenter(ball, state.anchorX, state.anchorY);
         setKeeperToIdlePosition(root, keeper);
@@ -2227,6 +2245,7 @@ public class Main extends Application {
             ImageView keeper,
             KeeperAnimator keeperAnimator,
             Rectangle keeperBoxOverlay,
+            Text goalText,
             Text roleText,
             Text scoreText,
             Text shotText,
@@ -2239,6 +2258,7 @@ public class Main extends Application {
             Runnable resetRound,
             double deltaSeconds
     ) {
+        updateGoalText(goalText, state, deltaSeconds);
         if (state.gameOver) {
             return;
         }
@@ -2319,6 +2339,7 @@ public class Main extends Application {
             );
         }
         updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
 
         double width = root.getWidth();
         double height = root.getHeight();
@@ -2335,6 +2356,7 @@ public class Main extends Application {
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
             state.phase = MultiplayerPhase.ROUND_DELAY;
             hintText.setText("GOAL UNTUK PLAYER " + state.shooterPlayer + ". Tunggu ronde berikutnya.");
+            triggerGoalText(goalText, state);
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
             return;
         }
@@ -2425,6 +2447,7 @@ public class Main extends Application {
             ImageView ball,
             ImageView keeper,
             KeeperAnimator keeperAnimator,
+            Text goalText,
             Rectangle resultOverlay,
             VBox resultBox,
             Text resultTitle,
@@ -2439,6 +2462,7 @@ public class Main extends Application {
             Runnable resetRound,
             double deltaSeconds
     ) {
+        updateGoalText(goalText, state, deltaSeconds);
         if (state.gameOver || state.roundFinished) {
             return;
         }
@@ -2514,6 +2538,7 @@ public class Main extends Application {
             );
         }
         updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
 
         double width = root.getWidth();
         double height = root.getHeight();
@@ -2528,6 +2553,7 @@ public class Main extends Application {
         }
 
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            triggerGoalText(goalText, state);
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
             return;
         }
@@ -2632,6 +2658,7 @@ public class Main extends Application {
             ImageView keeper,
             KeeperAnimator keeperAnimator,
             Rectangle keeperBoxOverlay,
+            Text goalText,
             Text scoreText,
             Text livesText,
             Rectangle[] lifeIndicators,
@@ -2644,6 +2671,7 @@ public class Main extends Application {
             Runnable resetRound,
             double deltaSeconds
     ) {
+        updateGoalText(goalText, state, deltaSeconds);
         if (state.gameOver) {
             return;
         }
@@ -2722,6 +2750,7 @@ public class Main extends Application {
             );
         }
         updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
 
         double width = root.getWidth();
         double height = root.getHeight();
@@ -2736,6 +2765,7 @@ public class Main extends Application {
         }
 
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            triggerGoalText(goalText, state);
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
             return;
         }
@@ -2973,6 +3003,7 @@ public class Main extends Application {
         state.pendingRoundResult = ROUND_RESULT_NONE;
         state.roundResult = ROUND_RESULT_NONE;
         state.roundResolveTimer = 0;
+        state.goalTextTimerSeconds = 0;
         state.keeperFallElapsedSeconds = 0;
         state.keeperMoveElapsedSeconds = 0;
         state.keeperMoveDurationSeconds = 0;
@@ -2991,6 +3022,7 @@ public class Main extends Application {
 
         ball.setVisible(true);
         ball.setRotate(0);
+        resetBallPerspective(ball);
         setCenter(ball, state.anchorX, state.anchorY);
         setKeeperToIdlePosition(root, keeper);
         keeperAnimator.showIdle();
@@ -3392,6 +3424,90 @@ public class Main extends Application {
 
     private void setCenterForMotion(ImageView imageView, double centerX, double centerY) {
         setCenter(imageView, snapToRetro(centerX), snapToRetro(centerY));
+    }
+
+
+    private Text createGoalText(StackPane root) {
+        Text goalText = new Text("GOOOAL!");
+        goalText.setFill(Color.rgb(255, 224, 64));
+        goalText.setStroke(Color.rgb(25, 12, 0, 0.92));
+        goalText.setStrokeWidth(4.5);
+        goalText.setFont(loadFont(START_FONT_PATH, 82, Font.font("Arial", FontWeight.EXTRA_BOLD, 82)));
+        goalText.setMouseTransparent(true);
+        goalText.setVisible(false);
+        goalText.setOpacity(0);
+        goalText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - goalText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                goalText.layoutBoundsProperty()
+        ));
+        goalText.layoutYProperty().bind(root.heightProperty().multiply(0.24));
+        return goalText;
+    }
+
+    private void triggerGoalText(Text goalText, EndlessState state) {
+        if (goalText == null) {
+            return;
+        }
+        state.goalTextTimerSeconds = GOAL_TEXT_DURATION_SECONDS;
+        goalText.setVisible(true);
+        goalText.setOpacity(1);
+        goalText.setScaleX(0.72);
+        goalText.setScaleY(0.72);
+        goalText.setRotate(-2);
+    }
+
+    private void updateGoalText(Text goalText, EndlessState state, double deltaSeconds) {
+        if (goalText == null) {
+            return;
+        }
+        if (state.goalTextTimerSeconds <= 0) {
+            goalText.setOpacity(0);
+            goalText.setVisible(false);
+            return;
+        }
+
+        state.goalTextTimerSeconds = Math.max(0, state.goalTextTimerSeconds - deltaSeconds);
+        double elapsed = GOAL_TEXT_DURATION_SECONDS - state.goalTextTimerSeconds;
+        double popProgress = clamp(elapsed / GOAL_TEXT_POP_SECONDS, 0, 1);
+        double fadeOut = clamp(state.goalTextTimerSeconds / GOAL_TEXT_FADE_OUT_SECONDS, 0, 1);
+        double opacity = Math.min(1, popProgress * 1.35) * fadeOut;
+        double pulse = Math.sin(elapsed * 18.0) * 0.025;
+        double scale = 0.72 + 0.42 * easeOutQuad(popProgress) + pulse;
+
+        goalText.setVisible(true);
+        goalText.setOpacity(opacity);
+        goalText.setScaleX(scale);
+        goalText.setScaleY(scale);
+        goalText.setRotate(-2 + Math.sin(elapsed * 12.0) * 2.0);
+
+        if (state.goalTextTimerSeconds <= 0) {
+            goalText.setOpacity(0);
+            goalText.setVisible(false);
+            goalText.setScaleX(1);
+            goalText.setScaleY(1);
+            goalText.setRotate(0);
+        }
+    }
+
+    private void resetBallPerspective(ImageView ball) {
+        ball.setScaleX(1.0);
+        ball.setScaleY(1.0);
+    }
+
+    private void updateBallPerspectiveScale(ImageView ball, EndlessState state) {
+        double totalDistance = Math.hypot(state.targetX - state.anchorX, state.targetY - state.anchorY);
+        if (totalDistance <= 1) {
+            resetBallPerspective(ball);
+            return;
+        }
+
+        double currentDistance = Math.hypot(getCenterX(ball) - state.anchorX, getCenterY(ball) - state.anchorY);
+        double progress = clamp(currentDistance / totalDistance, 0, 1);
+        double easedProgress = Math.pow(progress, BALL_PERSPECTIVE_CURVE);
+        double scale = lerp(1.0, BALL_MIN_PERSPECTIVE_SCALE, easedProgress);
+        ball.setScaleX(scale);
+        ball.setScaleY(scale);
     }
 
     private void updateBallRetroRotation(ImageView ball, EndlessState state, double deltaSeconds) {
@@ -3865,6 +3981,7 @@ public class Main extends Application {
         int keeperDiveDirection;
         int roundResult;
         double roundResolveTimer;
+        double goalTextTimerSeconds;
         boolean keeperWillCatch;
         boolean roundResolving;
         boolean awaitingKeeperAnimationFinish;
