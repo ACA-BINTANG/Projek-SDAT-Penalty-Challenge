@@ -46,8 +46,13 @@ import java.util.Random;
 public class Main extends Application {
     private static final String INTRO_VIDEO_PATH = "resources/video/Intro-Awal.mp4";
     private static final String MENU_BACKGROUND_PATH = "resources/images/Tampilan-BG-Menu.png";
-    private static final String MENU_BOX_OFF_PATH = "resources/images/Box-Menu-off.png";
-    private static final String MENU_BOX_ON_PATH = "resources/images/Box-Menu-on.png";
+    private static final String MENU_BOX_OFF_PATH = "resources/images/No-selected.png";
+    private static final String MENU_BOX_ON_PATH = "resources/images/Selected.png";
+    private static final String MENU_LABEL_TOURNAMENT_PATH = "resources/images/Tournament.png";
+    private static final String MENU_LABEL_MULTIPLAYER_PATH = "resources/images/Co-op.png";
+    private static final String MENU_LABEL_ENDLESS_PATH = "resources/images/Endless.png";
+    private static final String MENU_LABEL_TUTORIAL_PATH = "resources/images/Tutorial.png";
+    private static final String MENU_LABEL_EXIT_PATH = "resources/images/Exit.png";
     private static final String TOURNAMENT_BACKGROUND_PATH = "resources/images/Tampilan-BG-Turnament.png";
     private static final String TOURNAMENT_BRACKET_PATH = "resources/images/Bagan-Tournament.png";
     private static final String GOAL_BACKGROUND_PATH = "resources/images/GAWANG.png";
@@ -59,6 +64,8 @@ public class Main extends Application {
     private static final String KEEPER_RIGHT_CATCH_FOLDER = "resources/images/karakter/keper/lompatkanantangkap";
     private static final String KEEPER_LEFT_FOLDER = "resources/images/karakter/keper/lompat kiri";
     private static final String KEEPER_LEFT_CATCH_FOLDER = "resources/images/karakter/keper/lompattangkapkiri";
+    private static final String KEEPER_UP_FOLDER = "resources/images/karakter/keper/loncat";
+    private static final String KEEPER_UP_CATCH_FOLDER = "resources/images/karakter/keper/loncat tangkap";
     private static final String TOP_SCORE_PATH = "top_scores.txt";
     private static final String START_FONT_PATH = "resources/fonts/MinecraftBoldItalic-1y1e.otf";
     private static final String MENU_FONT_PATH = "resources/fonts/MinecraftRegular-Bmg3.otf";
@@ -77,22 +84,41 @@ public class Main extends Application {
     private static final double KEEPER_DIVE_SENSOR_X_OFFSET_RATIO = 0.20;
     private static final double KEEPER_DIVE_SENSOR_Y_OFFSET_RATIO = 0.10;
     private static final double KEEPER_EDGE_PADDING_RATIO = 0.015;
-    private static final double MAX_PULL_DISTANCE = 160;
-    private static final double MIN_SHOT_DISTANCE = 150;
-    private static final double MAX_SHOT_DISTANCE = 840;
-    private static final double MIN_BALL_SPEED = 520;
-    private static final double MAX_BALL_SPEED = 1220;
-    private static final double UPWARD_SHOT_BONUS = 1.08;
+    private static final double MAX_PULL_DISTANCE = 230;
+    private static final double MIN_SHOT_DISTANCE = 100;
+    private static final double MAX_SHOT_DISTANCE = 650;
+    private static final double MIN_BALL_SPEED = 360;
+    private static final double MAX_BALL_SPEED = 900;
+    private static final double UPWARD_SHOT_BONUS = 1.00;
+    private static final double SHOT_POWER_CURVE = 1.35;
+    private static final double SHOT_DISTANCE_GOAL_MULTIPLIER = 1.45;
     private static final double KEEPER_MAX_READ_CHANCE = 0.82;
     private static final double KEEPER_READ_GROWTH_PER_POINT = 0.08;
     private static final double KEEPER_FRAME_SECONDS = 0.19;
     private static final double KEEPER_LANDING_FRAME_HOLD_SECONDS = 1.0;
-    private static final double ROUND_RESULT_DELAY_SECONDS = 0.05;
+    private static final double ROUND_RESULT_DELAY_SECONDS = 2.0;
     private static final double KEEPER_DIVE_TRIGGER_RATIO = 0.045;
     private static final double KEEPER_FINAL_HOLD_SECONDS = 2.0;
     private static final double KEEPER_MOVE_SPEED = 760;
-    private static final double KEEPER_CATCH_FALL_SPEED = 420;
+    // Gerak lompat samping dibuat melengkung, bukan garis lurus segitiga.
+    private static final double KEEPER_SIDE_DIVE_ARC_SECONDS = 0.56;
+    private static final double KEEPER_SIDE_DIVE_ARC_HEIGHT_RATIO = 0.105;
+    private static final double KEEPER_FALL_ARC_HEIGHT_RATIO = 0.085;
+    // Durasi keeper turun dari titik loncat ke tanah. Gerak ini bukan animasi balik ke posisi awal.
+    private static final double KEEPER_FALL_TO_GROUND_SECONDS = 0.45;
     private static final double KEEPER_CATCH_FALL_SIDE_RATIO = 0.50;
+    // Efek retro: posisi bola dan keeper di-update per langkah frame rendah agar terasa agak patah-patah.
+    private static final boolean RETRO_MOTION_ENABLED = false;
+    private static final double RETRO_MOTION_FPS = 13.0;
+    private static final double RETRO_MOTION_STEP_SECONDS = 1.0 / RETRO_MOTION_FPS;
+    private static final double RETRO_PIXEL_SNAP = 4.0;
+    private static final double BALL_RETRO_ROTATION_DEGREES_PER_SECOND = 720.0;
+    private static final double BALL_ROTATION_SNAP_DEGREES = 22.5;
+    private static final double BALL_MIN_PERSPECTIVE_SCALE = 0.62;
+    private static final double BALL_PERSPECTIVE_CURVE = 1.18;
+    private static final double GOAL_TEXT_DURATION_SECONDS = 1.55;
+    private static final double GOAL_TEXT_POP_SECONDS = 0.22;
+    private static final double GOAL_TEXT_FADE_OUT_SECONDS = 0.45;
     private static final double KEEPER_START_CENTER_Y_RATIO = 0.56;
     private static final double KEEPER_GROUND_TARGET_Y_RATIO = 0.56;
     private static final double KEEPER_FALL_FORWARD_OFFSET_RATIO = 0.030;
@@ -112,6 +138,12 @@ public class Main extends Application {
     private static final boolean SHOW_DEBUG_BOXES = false;
     private static final int MAX_PLAYER_LIVES = 3;
     private static final int TOURNAMENT_SHOTS_PER_ROUND = 5;
+    private static final int MULTIPLAYER_SHOTS_PER_PLAYER = 5;
+    private static final int MULTIPLAYER_SCORE_EMPTY = 0;
+    private static final int MULTIPLAYER_SCORE_GOAL = 1;
+    private static final int MULTIPLAYER_SCORE_FAIL = 2;
+    private static final double PLAYER_TAG_DISPLAY_SECONDS = 3.2;
+    private static final double PLAYER_TAG_FADE_SECONDS = 0.55;
     private static final String[] TOURNAMENT_ROUNDS = {"QUARTER FINAL", "SEMI FINAL", "FINAL"};
     private static final int[] TOURNAMENT_TARGETS = {2, 3, 4};
     private static final String[] TOURNAMENT_OPPONENTS = {
@@ -280,14 +312,20 @@ private Path resolveResource(String relativePath) {
         menuBox.setAlignment(Pos.CENTER);
         menuBox.setMaxWidth(MENU_OPTION_WIDTH);
 
-        String[] modes = {"ENDLESS", "CO-OP", "TOURNAMENT", "TUTORIAL"};
+        String[] modes = {"TOURNAMENT", "MULTIPLAYER", "ENDLESS", "TUTORIAL", "EXIT"};
 
         for (int i = 0; i < modes.length; i++) {
             StackPane option = createMenuOption(modes[i]);
             if ("ENDLESS".equals(modes[i])) {
                 option.setOnMouseClicked(event -> showEndlessMode(stage));
+            } else if ("MULTIPLAYER".equals(modes[i]) || "CO-OP".equals(modes[i])) {
+                option.setOnMouseClicked(event -> showMultiplayerMode(stage));
             } else if ("TOURNAMENT".equals(modes[i])) {
                 option.setOnMouseClicked(event -> showTournamentMode(stage));
+            } else if ("TUTORIAL".equals(modes[i])) {
+                option.setOnMouseClicked(event -> showTutorialMode(stage));
+            } else if ("EXIT".equals(modes[i])) {
+                option.setOnMouseClicked(event -> Platform.exit());
             }
             menuBox.getChildren().add(option);
         }
@@ -300,20 +338,74 @@ private Path resolveResource(String relativePath) {
         scene.setCursor(Cursor.DEFAULT);
     }
 
+    private void showTutorialMode(Stage stage) {
+        StackPane root = new StackPane();
+
+        ImageView background = createImageView(MENU_BACKGROUND_PATH);
+        background.setPreserveRatio(false);
+        background.fitWidthProperty().bind(root.widthProperty());
+        background.fitHeightProperty().bind(root.heightProperty());
+
+        Rectangle overlay = new Rectangle();
+        overlay.widthProperty().bind(root.widthProperty());
+        overlay.heightProperty().bind(root.heightProperty());
+        overlay.setFill(Color.rgb(0, 0, 0, 0.58));
+
+        VBox panel = new VBox(14);
+        panel.setAlignment(Pos.CENTER);
+        panel.setPadding(new Insets(28));
+        panel.setMaxWidth(760);
+        panel.setBackground(new Background(new BackgroundFill(Color.rgb(8, 18, 60, 0.88), new CornerRadii(18), Insets.EMPTY)));
+
+        Text title = new Text("TUTORIAL");
+        title.setFill(Color.WHITE);
+        title.setFont(loadFont(MENU_FONT_PATH, 42, Font.font("Arial", FontWeight.EXTRA_BOLD, 42)));
+
+        Text info = new Text("Tarik bola untuk memilih arah tendangan.\nDi multiplayer, penendang memilih arah bola lebih dulu.\nSetelah itu keeper memilih arah tangkapan.\nJika dua pemain sudah memilih arah, eksekusi berjalan otomatis.\nESC = kembali ke menu.");
+        info.setFill(Color.WHITE);
+        info.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
+        info.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+
+        panel.getChildren().addAll(title, info);
+        root.getChildren().addAll(background, overlay, panel);
+
+        Scene scene = new Scene(root, 1280, 720);
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                showMenu(stage);
+            }
+        });
+        stage.setScene(scene);
+        stage.setFullScreen(true);
+        scene.setCursor(Cursor.DEFAULT);
+    }
+
     private StackPane createMenuOption(String modeName) {
         ImageView offFrame = createImageView(MENU_BOX_OFF_PATH);
         ImageView onFrame = createImageView(MENU_BOX_ON_PATH);
         offFrame.setFitWidth(MENU_OPTION_WIDTH);
         onFrame.setFitWidth(MENU_OPTION_WIDTH);
-        offFrame.setPreserveRatio(true);
-        onFrame.setPreserveRatio(true);
+        offFrame.setFitHeight(MENU_OPTION_HEIGHT);
+        onFrame.setFitHeight(MENU_OPTION_HEIGHT);
+        offFrame.setPreserveRatio(false);
+        onFrame.setPreserveRatio(false);
+        offFrame.setSmooth(false);
+        onFrame.setSmooth(false);
 
-        Text label = new Text(modeName);
-        label.setFill(Color.WHITE);
-        label.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
-        label.setMouseTransparent(true);
+        ImageView labelImage = createMenuLabelImage(modeName);
+        if (labelImage != null) {
+            labelImage.setMouseTransparent(true);
+        }
 
-        StackPane option = new StackPane(offFrame, onFrame, label);
+        Text fallbackLabel = new Text(getMenuDisplayName(modeName));
+        fallbackLabel.setFill(Color.WHITE);
+        fallbackLabel.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
+        fallbackLabel.setMouseTransparent(true);
+        fallbackLabel.setVisible(labelImage == null);
+
+        StackPane option = labelImage == null
+                ? new StackPane(offFrame, onFrame, fallbackLabel)
+                : new StackPane(offFrame, onFrame, labelImage);
         option.setMinSize(MENU_OPTION_WIDTH, MENU_OPTION_HEIGHT);
         option.setMaxSize(MENU_OPTION_WIDTH, MENU_OPTION_HEIGHT);
         option.setCursor(Cursor.HAND);
@@ -322,13 +414,78 @@ private Path resolveResource(String relativePath) {
         option.setOnMouseEntered(event -> {
             onFrame.setVisible(true);
             offFrame.setVisible(false);
+            option.setScaleX(1.03);
+            option.setScaleY(1.03);
         });
         option.setOnMouseExited(event -> {
             onFrame.setVisible(false);
             offFrame.setVisible(true);
+            option.setScaleX(1.0);
+            option.setScaleY(1.0);
+        });
+        option.setOnMousePressed(event -> {
+            option.setScaleX(0.98);
+            option.setScaleY(0.98);
+        });
+        option.setOnMouseReleased(event -> {
+            option.setScaleX(1.03);
+            option.setScaleY(1.03);
         });
 
         return option;
+    }
+
+    private ImageView createMenuLabelImage(String modeName) {
+        String path = getMenuLabelPath(modeName);
+        if (path == null || !Files.exists(resolveResource(path))) {
+            return null;
+        }
+
+        ImageView imageView = createImageView(path);
+        imageView.setFitWidth(getMenuLabelWidth(modeName));
+        imageView.setPreserveRatio(true);
+        imageView.setSmooth(false);
+        return imageView;
+    }
+
+    private String getMenuLabelPath(String modeName) {
+        switch (modeName) {
+            case "TOURNAMENT":
+                return MENU_LABEL_TOURNAMENT_PATH;
+            case "MULTIPLAYER":
+            case "CO-OP":
+                return MENU_LABEL_MULTIPLAYER_PATH;
+            case "ENDLESS":
+                return MENU_LABEL_ENDLESS_PATH;
+            case "TUTORIAL":
+                return MENU_LABEL_TUTORIAL_PATH;
+            case "EXIT":
+                return MENU_LABEL_EXIT_PATH;
+            default:
+                return null;
+        }
+    }
+
+    private double getMenuLabelWidth(String modeName) {
+        switch (modeName) {
+            case "TOURNAMENT":
+                return 239.0;
+            case "MULTIPLAYER":
+            case "CO-OP":
+                return 190.5;
+            case "ENDLESS":
+                return 214.5;
+            case "TUTORIAL":
+                return 217.0;
+            case "EXIT":
+                return 177.0;
+            default:
+                return 180.0;
+        }
+    }
+
+    private String getMenuDisplayName(String modeName) {
+        return "MULTIPLAYER".equals(modeName) ? "CO-OP" : modeName;
     }
 
     private ImageView createImageView(String imagePath) {
@@ -457,6 +614,8 @@ private Image createFallbackImage() {
         hintText.setLayoutX(32);
         hintText.setLayoutY(82);
 
+        Text goalText = createGoalText(root);
+
         Button endlessMenuButton = createNavigationButton("MENU");
         endlessMenuButton.layoutXProperty().bind(root.widthProperty().subtract(118));
         endlessMenuButton.setLayoutY(28);
@@ -529,6 +688,7 @@ private Image createFallbackImage() {
                 targetMarker,
                 keeper,
                 ball,
+                goalText,
                 scoreText,
                 livesText,
                 livesIndicatorBox,
@@ -653,9 +813,9 @@ private Image createFallbackImage() {
             }
 
             chooseKeeperTarget(root, state);
-            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch, state.keeperVerticalJump);
             state.ballMoving = true;
-            state.keeperMoving = state.keeperJumping;
+            startKeeperJumpMovement(root, keeper, state, KEEPER_MOVE_SPEED);
         });
 
         AnimationTimer gameLoop = new AnimationTimer() {
@@ -676,6 +836,7 @@ private Image createFallbackImage() {
                         keeper,
                         keeperAnimator,
                         keeperBoxOverlay,
+                        goalText,
                         scoreText,
                         livesText,
                         lifeIndicators,
@@ -688,6 +849,365 @@ private Image createFallbackImage() {
                         resetRound,
                         deltaSeconds
                 );
+            }
+        };
+        gameLoop.start();
+    }
+
+
+    private void showMultiplayerMode(Stage stage) {
+        StackPane root = new StackPane();
+        Pane playLayer = new Pane();
+        playLayer.setPickOnBounds(true);
+
+        ImageView background = createImageView(GOAL_BACKGROUND_PATH);
+        background.setPreserveRatio(false);
+        background.fitWidthProperty().bind(root.widthProperty());
+        background.fitHeightProperty().bind(root.heightProperty());
+
+        ImageView keeper = createImageView(KEEPER_IMAGE_PATH);
+        keeper.setFitWidth(KEEPER_SIZE);
+        keeper.setFitHeight(KEEPER_SIZE);
+        keeper.setPreserveRatio(true);
+        KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
+        keeperAnimator.showIdle();
+
+        ImageView ball = createImageView(BALL_IMAGE_PATH);
+        ball.setFitWidth(BALL_SIZE);
+        ball.setFitHeight(BALL_SIZE);
+        ball.setPreserveRatio(true);
+        ball.setCursor(Cursor.HAND);
+
+        Line pullLine = new Line();
+        pullLine.setStroke(Color.rgb(255, 255, 255, 0.75));
+        pullLine.setStrokeWidth(4);
+        pullLine.setVisible(false);
+
+        Circle targetMarker = new Circle(8);
+        targetMarker.setFill(Color.rgb(255, 235, 95, 0.82));
+        targetMarker.setStroke(Color.rgb(255, 255, 255, 0.9));
+        targetMarker.setStrokeWidth(2);
+        targetMarker.setMouseTransparent(true);
+        targetMarker.setVisible(false);
+        targetMarker.setOpacity(0);
+
+        Circle keeperChoiceMarker = new Circle(12);
+        keeperChoiceMarker.setFill(Color.rgb(80, 210, 255, 0.50));
+        keeperChoiceMarker.setStroke(Color.WHITE);
+        keeperChoiceMarker.setStrokeWidth(3);
+        keeperChoiceMarker.setMouseTransparent(true);
+        keeperChoiceMarker.setVisible(false);
+        keeperChoiceMarker.setOpacity(0);
+
+        Rectangle pointBoxOverlay = new Rectangle();
+        pointBoxOverlay.setFill(Color.rgb(255, 0, 0, 0.24));
+        pointBoxOverlay.setStroke(Color.rgb(255, 0, 0, 0.78));
+        pointBoxOverlay.setStrokeWidth(3);
+        pointBoxOverlay.setMouseTransparent(true);
+        pointBoxOverlay.setVisible(SHOW_DEBUG_BOXES);
+        pointBoxOverlay.layoutXProperty().bind(root.widthProperty().multiply(GOAL_LEFT_RATIO));
+        pointBoxOverlay.layoutYProperty().bind(root.heightProperty().multiply(GOAL_TOP_RATIO));
+        pointBoxOverlay.widthProperty().bind(root.widthProperty().multiply(GOAL_RIGHT_RATIO - GOAL_LEFT_RATIO));
+        pointBoxOverlay.heightProperty().bind(root.heightProperty().multiply(GOAL_BOTTOM_RATIO - GOAL_TOP_RATIO));
+
+        Rectangle keeperBoxOverlay = new Rectangle();
+        keeperBoxOverlay.setFill(Color.rgb(0, 255, 80, 0.18));
+        keeperBoxOverlay.setStroke(Color.rgb(0, 255, 80, 0.82));
+        keeperBoxOverlay.setStrokeWidth(3);
+        keeperBoxOverlay.setMouseTransparent(true);
+        keeperBoxOverlay.setVisible(SHOW_DEBUG_BOXES);
+
+        Text roleText = new Text("PLAYER 1 PENENDANG  |  PLAYER 2 KEEPER");
+        roleText.setFill(Color.WHITE);
+        roleText.setFont(loadFont(MENU_FONT_PATH, 24, Font.font("Arial", FontWeight.BOLD, 24)));
+        roleText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - roleText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                roleText.layoutBoundsProperty()
+        ));
+        roleText.setLayoutY(45);
+
+        Text scoreText = new Text("P1: 0/5    P2: 0/5");
+        scoreText.setFill(Color.rgb(255, 235, 120));
+        scoreText.setFont(loadFont(MENU_FONT_PATH, 22, Font.font("Arial", FontWeight.BOLD, 22)));
+        scoreText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - scoreText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                scoreText.layoutBoundsProperty()
+        ));
+        scoreText.setLayoutY(78);
+
+        Text shotText = new Text("SHOT P1: 0/5  |  SHOT P2: 0/5");
+        shotText.setFill(Color.WHITE);
+        shotText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
+        shotText.setLayoutX(32);
+        shotText.setLayoutY(50);
+
+        Text hintText = new Text("PLAYER 1: tarik bola lalu lepas");
+        hintText.setFill(Color.rgb(255, 255, 255, 0.86));
+        hintText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
+        hintText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - hintText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                hintText.layoutBoundsProperty()
+        ));
+        hintText.setLayoutY(108);
+
+        Circle[] playerOneScoreCircles = new Circle[MULTIPLAYER_SHOTS_PER_PLAYER];
+        Circle[] playerTwoScoreCircles = new Circle[MULTIPLAYER_SHOTS_PER_PLAYER];
+        VBox multiplayerScoreBoard = createMultiplayerScoreBoard(playerOneScoreCircles, playerTwoScoreCircles);
+        multiplayerScoreBoard.setLayoutX(32);
+        multiplayerScoreBoard.setLayoutY(28);
+
+        Text shortcutText = new Text("ESC = MENU   |   R = ULANGI");
+        shortcutText.setFill(Color.rgb(255, 255, 255, 0.84));
+        shortcutText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
+        shortcutText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> root.getWidth() - shortcutText.getLayoutBounds().getWidth() - 32,
+                root.widthProperty(),
+                shortcutText.layoutBoundsProperty()
+        ));
+        shortcutText.setLayoutY(42);
+
+        Text playerOneTag = createMultiplayerPlayerTag("PLAYER 1", Color.rgb(235, 55, 55));
+        Text playerTwoTag = createMultiplayerPlayerTag("PLAYER 2", Color.rgb(70, 170, 255));
+        Text goalText = createGoalText(root);
+
+        Rectangle resultOverlay = new Rectangle();
+        resultOverlay.widthProperty().bind(root.widthProperty());
+        resultOverlay.heightProperty().bind(root.heightProperty());
+        resultOverlay.setFill(Color.rgb(0, 0, 0, 0.62));
+        resultOverlay.setMouseTransparent(true);
+        resultOverlay.setVisible(false);
+
+        Text resultTitle = new Text("PLAYER 1 MENANG");
+        resultTitle.setFill(Color.WHITE);
+        resultTitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        resultTitle.setFont(loadFont(MENU_FONT_PATH, 38, Font.font("Arial", FontWeight.EXTRA_BOLD, 38)));
+
+        Text resultDetail = new Text("P1: 0/5\nP2: 0/5");
+        resultDetail.setFill(Color.rgb(255, 235, 120));
+        resultDetail.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        resultDetail.setFont(loadFont(MENU_FONT_PATH, 22, Font.font("Arial", FontWeight.BOLD, 22)));
+
+        Text resultShortcutText = new Text("Tekan R untuk ulangi match. Tekan ESC untuk kembali ke menu.");
+        resultShortcutText.setFill(Color.rgb(255, 255, 255, 0.86));
+        resultShortcutText.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        resultShortcutText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
+
+        VBox resultBox = new VBox(16, resultTitle, resultDetail, resultShortcutText);
+        resultBox.setAlignment(Pos.CENTER);
+        resultBox.setPadding(new Insets(24));
+        resultBox.setBackground(new Background(new BackgroundFill(Color.rgb(0, 0, 0, 0.74), new CornerRadii(10), Insets.EMPTY)));
+        resultBox.setMaxWidth(520);
+        resultBox.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - resultBox.getBoundsInLocal().getWidth()) / 2,
+                root.widthProperty(),
+                resultBox.boundsInLocalProperty()
+        ));
+        resultBox.layoutYProperty().bind(root.heightProperty().multiply(0.36));
+        resultBox.setVisible(false);
+
+        playLayer.getChildren().addAll(
+                pointBoxOverlay,
+                keeperBoxOverlay,
+                pullLine,
+                keeper,
+                ball,
+                multiplayerScoreBoard,
+                shortcutText,
+                playerOneTag,
+                playerTwoTag,
+                goalText,
+                roleText,
+                hintText,
+                resultOverlay,
+                resultBox
+        );
+        root.getChildren().addAll(background, playLayer);
+
+        Scene scene = new Scene(root, 1280, 720);
+        stage.setScene(scene);
+        stage.setFullScreen(true);
+        scene.setCursor(Cursor.DEFAULT);
+
+        MultiplayerState state = new MultiplayerState();
+        Runnable resetRound = () -> {
+            resetMultiplayerRound(
+                    root,
+                    ball,
+                    keeper,
+                    pullLine,
+                    targetMarker,
+                    keeperChoiceMarker,
+                    keeperAnimator,
+                    state,
+                    roleText,
+                    scoreText,
+                    shotText,
+                    hintText
+            );
+            updateMultiplayerScoreBoard(state, playerOneScoreCircles, playerTwoScoreCircles);
+            updateMultiplayerPlayerTags(root, ball, keeper, playerOneTag, playerTwoTag, state, 0);
+        };
+        Runnable restartMatch = () -> {
+            state.playerOneGoals = 0;
+            state.playerTwoGoals = 0;
+            state.playerOneShots = 0;
+            state.playerTwoShots = 0;
+            state.shooterPlayer = 1;
+            state.keeperPlayer = 2;
+            clearMultiplayerShotResults(state);
+            state.gameOver = false;
+            state.phase = MultiplayerPhase.KICKER_AIM;
+            resultOverlay.setVisible(false);
+            resultBox.setVisible(false);
+            ball.setCursor(Cursor.HAND);
+            resetRound.run();
+        };
+
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                showMenu(stage);
+            } else if (event.getCode() == KeyCode.R && state.gameOver) {
+                restartMatch.run();
+            }
+        });
+
+        root.widthProperty().addListener((observable, oldValue, newValue) -> {
+            if (!state.ballMoving && !state.roundResolving) {
+                resetRound.run();
+            }
+        });
+        root.heightProperty().addListener((observable, oldValue, newValue) -> {
+            if (!state.ballMoving && !state.roundResolving) {
+                resetRound.run();
+            }
+        });
+        Platform.runLater(resetRound);
+
+        ball.setOnMousePressed(event -> {
+            if (state.gameOver || state.phase != MultiplayerPhase.KICKER_AIM || state.ballMoving) {
+                event.consume();
+                return;
+            }
+            state.dragging = true;
+            state.anchorX = getCenterX(ball);
+            state.anchorY = getCenterY(ball);
+            pullLine.setStartX(state.anchorX);
+            pullLine.setStartY(state.anchorY);
+            pullLine.setEndX(state.anchorX);
+            pullLine.setEndY(state.anchorY);
+            pullLine.setVisible(true);
+            targetMarker.setVisible(false);
+            keeperChoiceMarker.setVisible(false);
+            event.consume();
+        });
+
+        ball.setOnMouseDragged(event -> {
+            if (state.gameOver || state.phase != MultiplayerPhase.KICKER_AIM || !state.dragging || state.ballMoving) {
+                event.consume();
+                return;
+            }
+
+            double mouseX = event.getSceneX();
+            double mouseY = event.getSceneY();
+            double dx = mouseX - state.anchorX;
+            double dy = mouseY - state.anchorY;
+            double distance = Math.hypot(dx, dy);
+            if (distance > MAX_PULL_DISTANCE) {
+                dx = dx / distance * MAX_PULL_DISTANCE;
+                dy = dy / distance * MAX_PULL_DISTANCE;
+            }
+
+            setCenter(ball, state.anchorX + dx, state.anchorY + dy);
+            pullLine.setEndX(getCenterX(ball));
+            pullLine.setEndY(getCenterY(ball));
+            updateTargetMarker(root, ball, targetMarker, state);
+            event.consume();
+        });
+
+        ball.setOnMouseReleased(event -> {
+            if (state.gameOver || state.phase != MultiplayerPhase.KICKER_AIM || !state.dragging || state.ballMoving) {
+                event.consume();
+                return;
+            }
+
+            state.dragging = false;
+            pullLine.setVisible(false);
+            targetMarker.setVisible(false);
+            applyKickForce(root, ball, state);
+            if (state.shotSpeed < MIN_BALL_SPEED + 20) {
+                hintText.setText("Tarikan terlalu lemah. PLAYER " + state.shooterPlayer + ": ulangi arah bola.");
+                setCenter(ball, state.anchorX, state.anchorY);
+                event.consume();
+                return;
+            }
+
+            state.phase = MultiplayerPhase.KEEPER_AIM;
+            state.playerTagFadeTimerSeconds = 0;
+            ball.setCursor(Cursor.DEFAULT);
+            updateMultiplayerTexts(roleText, scoreText, shotText, hintText, state);
+            event.consume();
+        });
+
+        playLayer.setOnMouseClicked(event -> {
+            if (state.gameOver || state.phase != MultiplayerPhase.KEEPER_AIM || state.ballMoving || state.roundResolving) {
+                return;
+            }
+
+            double selectedX = event.getX();
+            double selectedY = event.getY();
+            if (!isPointInsidePointBox(root, selectedX, selectedY)) {
+                hintText.setText("PLAYER " + state.keeperPlayer + ": klik area gawang untuk arah keeper.");
+                return;
+            }
+
+            keeperChoiceMarker.setCenterX(selectedX);
+            keeperChoiceMarker.setCenterY(selectedY);
+            keeperChoiceMarker.setVisible(false);
+            prepareMultiplayerKeeperTarget(root, state, selectedX, selectedY);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch, state.keeperVerticalJump);
+            state.phase = MultiplayerPhase.EXECUTING;
+            state.ballMoving = true;
+            startKeeperJumpMovement(root, keeper, state, KEEPER_MOVE_SPEED);
+            updateMultiplayerTexts(roleText, scoreText, shotText, hintText, state);
+            event.consume();
+        });
+
+        AnimationTimer gameLoop = new AnimationTimer() {
+            private long lastFrameTime = 0;
+
+            @Override
+            public void handle(long now) {
+                if (lastFrameTime == 0) {
+                    lastFrameTime = now;
+                    return;
+                }
+
+                double deltaSeconds = (now - lastFrameTime) / 1_000_000_000.0;
+                lastFrameTime = now;
+                updateMultiplayer(
+                        root,
+                        ball,
+                        keeper,
+                        keeperAnimator,
+                        keeperBoxOverlay,
+                        goalText,
+                        roleText,
+                        scoreText,
+                        shotText,
+                        hintText,
+                        resultOverlay,
+                        resultBox,
+                        resultTitle,
+                        resultDetail,
+                        state,
+                        resetRound,
+                        deltaSeconds
+                );
+                updateMultiplayerScoreBoard(state, playerOneScoreCircles, playerTwoScoreCircles);
+                updateMultiplayerPlayerTags(root, ball, keeper, playerOneTag, playerTwoTag, state, deltaSeconds);
             }
         };
         gameLoop.start();
@@ -760,6 +1280,8 @@ private Image createFallbackImage() {
         hintText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
         hintText.layoutXProperty().bind(root.widthProperty().subtract(250));
         hintText.setLayoutY(78);
+
+        Text goalText = createGoalText(root);
 
         Button backToBracketButton = createNavigationButton("KEMBALI");
         backToBracketButton.layoutXProperty().bind(root.widthProperty().subtract(118));
@@ -834,6 +1356,7 @@ private Image createFallbackImage() {
                 targetMarker,
                 keeper,
                 ball,
+                goalText,
                 roundText,
                 targetText,
                 shotsText,
@@ -1045,9 +1568,9 @@ private Image createFallbackImage() {
             }
 
             chooseKeeperTarget(root, state);
-            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch, state.keeperVerticalJump);
             state.ballMoving = true;
-            state.keeperMoving = state.keeperJumping;
+            startKeeperJumpMovement(root, keeper, state, KEEPER_MOVE_SPEED + state.roundIndex * 45);
         });
 
         AnimationTimer gameLoop = new AnimationTimer() {
@@ -1067,6 +1590,7 @@ private Image createFallbackImage() {
                         ball,
                         keeper,
                         keeperAnimator,
+                        goalText,
                         resultOverlay,
                         resultBox,
                         resultTitle,
@@ -1400,11 +1924,530 @@ private Image createFallbackImage() {
         return Math.max(min, Math.min(max, value));
     }
 
+
+    private void resetMultiplayerRound(
+            StackPane root,
+            ImageView ball,
+            ImageView keeper,
+            Line pullLine,
+            Circle targetMarker,
+            Circle keeperChoiceMarker,
+            KeeperAnimator keeperAnimator,
+            MultiplayerState state,
+            Text roleText,
+            Text scoreText,
+            Text shotText,
+            Text hintText
+    ) {
+        if (root.getWidth() <= 0 || root.getHeight() <= 0) {
+            return;
+        }
+
+        state.ballMoving = false;
+        state.dragging = false;
+        state.keeperMoving = false;
+        state.keeperFallingAfterCatch = false;
+        state.keeperReturningToIdle = false;
+        state.keeperJumping = false;
+        state.keeperVerticalJump = false;
+        state.keeperWillCatch = false;
+        state.keeperDiveDirection = 0;
+        state.roundResolving = false;
+        state.awaitingKeeperAnimationFinish = false;
+        state.pendingRoundResult = ROUND_RESULT_NONE;
+        state.roundResult = ROUND_RESULT_NONE;
+        state.roundResolveTimer = 0;
+        state.goalTextTimerSeconds = 0;
+        state.keeperFallElapsedSeconds = 0;
+        state.keeperMoveElapsedSeconds = 0;
+        state.keeperMoveDurationSeconds = 0;
+        state.keeperMoveArcHeight = 0;
+        state.keeperFallArcHeight = 0;
+        state.keeperRetroAccumulatorSeconds = 0;
+        state.ballRetroAccumulatorSeconds = 0;
+        state.retroMotionAccumulatorSeconds = 0;
+        state.velocityX = 0;
+        state.velocityY = 0;
+        state.shotSpeed = 0;
+        state.anchorX = root.getWidth() * 0.5;
+        state.anchorY = root.getHeight() * 0.78;
+        state.targetX = state.anchorX;
+        state.targetY = state.anchorY;
+        state.phase = state.gameOver ? MultiplayerPhase.GAME_OVER : MultiplayerPhase.KICKER_AIM;
+
+        ball.setVisible(true);
+        ball.setRotate(0);
+        resetBallPerspective(ball);
+        ball.setCursor(state.gameOver ? Cursor.DEFAULT : Cursor.HAND);
+        setCenter(ball, state.anchorX, state.anchorY);
+        setKeeperToIdlePosition(root, keeper);
+        keeperAnimator.showIdle();
+        pullLine.setVisible(false);
+        targetMarker.setVisible(false);
+        keeperChoiceMarker.setVisible(false);
+        state.playerTagFadeTimerSeconds = 0;
+        updateMultiplayerTexts(roleText, scoreText, shotText, hintText, state);
+    }
+
+    private VBox createMultiplayerScoreBoard(Circle[] playerOneCircles, Circle[] playerTwoCircles) {
+        Text playerOneLabel = createScoreBoardLabel("PLAYER 1", Color.rgb(235, 55, 55));
+        Text playerTwoLabel = createScoreBoardLabel("PLAYER 2", Color.rgb(70, 170, 255));
+
+        HBox playerOneRow = new HBox(8);
+        playerOneRow.setAlignment(Pos.CENTER_LEFT);
+        playerOneRow.getChildren().add(playerOneLabel);
+        for (int i = 0; i < playerOneCircles.length; i++) {
+            playerOneCircles[i] = createScoreCircle();
+            playerOneRow.getChildren().add(playerOneCircles[i]);
+        }
+
+        HBox playerTwoRow = new HBox(8);
+        playerTwoRow.setAlignment(Pos.CENTER_LEFT);
+        playerTwoRow.getChildren().add(playerTwoLabel);
+        for (int i = 0; i < playerTwoCircles.length; i++) {
+            playerTwoCircles[i] = createScoreCircle();
+            playerTwoRow.getChildren().add(playerTwoCircles[i]);
+        }
+
+        VBox board = new VBox(8, playerOneRow, playerTwoRow);
+        board.setPadding(new Insets(10, 12, 10, 12));
+        board.setBackground(new Background(new BackgroundFill(Color.rgb(0, 0, 0, 0.48), new CornerRadii(8), Insets.EMPTY)));
+        board.setMouseTransparent(true);
+        return board;
+    }
+
+    private Text createScoreBoardLabel(String value, Color color) {
+        Text label = new Text(value);
+        label.setFill(color);
+        label.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.EXTRA_BOLD, 18)));
+        label.setStroke(Color.rgb(0, 0, 0, 0.45));
+        label.setStrokeWidth(0.8);
+        return label;
+    }
+
+    private Circle createScoreCircle() {
+        Circle circle = new Circle(9);
+        circle.setFill(Color.rgb(32, 32, 32, 0.82));
+        circle.setStroke(Color.rgb(255, 255, 255, 0.72));
+        circle.setStrokeWidth(2);
+        return circle;
+    }
+
+    private void updateMultiplayerScoreBoard(MultiplayerState state, Circle[] playerOneCircles, Circle[] playerTwoCircles) {
+        updateMultiplayerScoreRow(playerOneCircles, state.playerOneShotResults);
+        updateMultiplayerScoreRow(playerTwoCircles, state.playerTwoShotResults);
+    }
+
+    private void updateMultiplayerScoreRow(Circle[] circles, int[] shotResults) {
+        for (int i = 0; i < circles.length && i < shotResults.length; i++) {
+            int result = shotResults[i];
+            if (result == MULTIPLAYER_SCORE_GOAL) {
+                circles[i].setFill(Color.rgb(35, 220, 90, 0.95));
+                circles[i].setStroke(Color.rgb(210, 255, 220, 0.95));
+            } else if (result == MULTIPLAYER_SCORE_FAIL) {
+                circles[i].setFill(Color.rgb(225, 45, 45, 0.95));
+                circles[i].setStroke(Color.rgb(255, 210, 210, 0.95));
+            } else {
+                circles[i].setFill(Color.rgb(32, 32, 32, 0.82));
+                circles[i].setStroke(Color.rgb(255, 255, 255, 0.72));
+            }
+        }
+    }
+
+    private void clearMultiplayerShotResults(MultiplayerState state) {
+        for (int i = 0; i < MULTIPLAYER_SHOTS_PER_PLAYER; i++) {
+            state.playerOneShotResults[i] = MULTIPLAYER_SCORE_EMPTY;
+            state.playerTwoShotResults[i] = MULTIPLAYER_SCORE_EMPTY;
+        }
+    }
+
+    private void recordMultiplayerShotResult(MultiplayerState state, boolean goal) {
+        int value = goal ? MULTIPLAYER_SCORE_GOAL : MULTIPLAYER_SCORE_FAIL;
+        if (state.shooterPlayer == 1) {
+            int index = clampInt(state.playerOneShots, 0, MULTIPLAYER_SHOTS_PER_PLAYER - 1);
+            state.playerOneShotResults[index] = value;
+        } else {
+            int index = clampInt(state.playerTwoShots, 0, MULTIPLAYER_SHOTS_PER_PLAYER - 1);
+            state.playerTwoShotResults[index] = value;
+        }
+    }
+
+    private Text createMultiplayerPlayerTag(String value, Color color) {
+        Text tag = new Text(value);
+        tag.setFill(color);
+        tag.setStroke(Color.rgb(0, 0, 0, 0.55));
+        tag.setStrokeWidth(0.8);
+        tag.setFont(loadFont(MENU_FONT_PATH, 24, Font.font("Arial", FontWeight.EXTRA_BOLD, 24)));
+        tag.setMouseTransparent(true);
+        tag.setOpacity(0);
+        return tag;
+    }
+
+    private void updateMultiplayerPlayerTags(
+            StackPane root,
+            ImageView ball,
+            ImageView keeper,
+            Text playerOneTag,
+            Text playerTwoTag,
+            MultiplayerState state,
+            double deltaSeconds
+    ) {
+        if (root.getWidth() <= 0 || root.getHeight() <= 0) {
+            return;
+        }
+
+        boolean showTags = !state.gameOver
+                && (state.phase == MultiplayerPhase.KICKER_AIM || state.phase == MultiplayerPhase.KEEPER_AIM);
+        if (showTags) {
+            state.playerTagFadeTimerSeconds += Math.max(0, deltaSeconds);
+        }
+
+        double opacity = 0;
+        if (showTags && state.playerTagFadeTimerSeconds < PLAYER_TAG_DISPLAY_SECONDS) {
+            double fadeIn = clamp(state.playerTagFadeTimerSeconds / PLAYER_TAG_FADE_SECONDS, 0, 1);
+            double fadeOut = clamp((PLAYER_TAG_DISPLAY_SECONDS - state.playerTagFadeTimerSeconds) / PLAYER_TAG_FADE_SECONDS, 0, 1);
+            opacity = Math.min(fadeIn, fadeOut);
+        }
+
+        playerOneTag.setOpacity(opacity);
+        playerTwoTag.setOpacity(opacity);
+
+        placeMultiplayerPlayerTag(root, ball, keeper, playerOneTag, state, 1);
+        placeMultiplayerPlayerTag(root, ball, keeper, playerTwoTag, state, 2);
+    }
+
+    private void placeMultiplayerPlayerTag(
+            StackPane root,
+            ImageView ball,
+            ImageView keeper,
+            Text tag,
+            MultiplayerState state,
+            int playerNumber
+    ) {
+        boolean isShooter = state.shooterPlayer == playerNumber;
+        ImageView target = isShooter ? ball : keeper;
+
+        double xOffset = isShooter ? BALL_SIZE * 0.80 : KEEPER_SIZE * 0.28;
+        double yOffset = isShooter ? -BALL_SIZE * 0.25 : -KEEPER_SIZE * 0.23;
+        double x = getCenterX(target) + xOffset;
+        double y = getCenterY(target) + yOffset;
+
+        double tagWidth = tag.getLayoutBounds().getWidth();
+        double tagHeight = tag.getLayoutBounds().getHeight();
+        x = clamp(x, 18, Math.max(18, root.getWidth() - tagWidth - 18));
+        y = clamp(y, tagHeight + 18, Math.max(tagHeight + 18, root.getHeight() - 18));
+
+        tag.setLayoutX(x);
+        tag.setLayoutY(y);
+    }
+
+    private void updateMultiplayerTexts(
+            Text roleText,
+            Text scoreText,
+            Text shotText,
+            Text hintText,
+            MultiplayerState state
+    ) {
+        roleText.setText("PLAYER " + state.shooterPlayer + " PENENDANG  |  PLAYER " + state.keeperPlayer + " KEEPER");
+        scoreText.setText("P1: " + state.playerOneGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
+                + "    P2: " + state.playerTwoGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER);
+        shotText.setText("SHOT P1: " + state.playerOneShots + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
+                + "  |  SHOT P2: " + state.playerTwoShots + "/" + MULTIPLAYER_SHOTS_PER_PLAYER);
+
+        if (state.phase == MultiplayerPhase.KICKER_AIM) {
+            hintText.setText("PLAYER " + state.shooterPlayer + ": tarik bola lalu lepas.");
+        } else if (state.phase == MultiplayerPhase.KEEPER_AIM) {
+            hintText.setText("PLAYER " + state.keeperPlayer + ": klik area gawang untuk arah keeper.");
+        } else if (state.phase == MultiplayerPhase.EXECUTING) {
+            hintText.setText("EKSEKUSI: bola dan keeper bergerak.");
+        } else if (state.phase == MultiplayerPhase.ROUND_DELAY) {
+            hintText.setText("Ronde selesai. Tunggu ronde berikutnya.");
+        } else {
+            hintText.setText("MATCH SELESAI.");
+        }
+    }
+
+    private void prepareMultiplayerKeeperTarget(
+            StackPane root,
+            MultiplayerState state,
+            double selectedX,
+            double selectedY
+    ) {
+        double centerX = root.getWidth() * 0.5;
+        double centerY = root.getHeight() * KEEPER_START_CENTER_Y_RATIO;
+        double sideThreshold = Math.max(42, root.getWidth() * KEEPER_DIVE_TRIGGER_RATIO);
+
+        int direction;
+        if (selectedX > centerX + sideThreshold) {
+            direction = 1;
+        } else if (selectedX < centerX - sideThreshold) {
+            direction = -1;
+        } else {
+            direction = 0;
+        }
+
+        boolean upperCenterSelection = direction == 0 && selectedY < centerY - root.getHeight() * 0.045;
+        state.keeperDiveDirection = direction;
+        state.keeperVerticalJump = upperCenterSelection;
+
+        double minCenterX = getKeeperMovementMinX(root);
+        double maxCenterX = getKeeperMovementMaxX(root);
+        double minCenterY = getKeeperMovementMinY(root);
+        double maxCenterY = getKeeperMovementMaxY(root);
+
+        if (direction == 0) {
+            state.keeperTargetX = centerX;
+            state.keeperTargetY = clamp(
+                    selectedY - getKeeperSensorOffsetY(0),
+                    minCenterY,
+                    maxCenterY
+            );
+        } else {
+            state.keeperTargetX = clamp(
+                    selectedX - getKeeperSensorOffsetX(direction),
+                    minCenterX,
+                    maxCenterX
+            );
+            state.keeperTargetY = clamp(
+                    selectedY - getKeeperSensorOffsetY(direction),
+                    minCenterY,
+                    maxCenterY
+            );
+        }
+
+        state.keeperJumping = upperCenterSelection
+                || Math.hypot(state.keeperTargetX - centerX, state.keeperTargetY - centerY) > 18;
+        if (state.keeperJumping) {
+            configureKeeperJumpMotion(root, state, centerX, centerY);
+        }
+
+        boolean shotInsideGoal = isPointInsidePointBox(root, state.targetX, state.targetY);
+        state.keeperWillCatch = shotInsideGoal && isMultiplayerKeeperSelectionSavingShot(state);
+    }
+
+    private boolean isMultiplayerKeeperSelectionSavingShot(MultiplayerState state) {
+        int logicalFrame = state.keeperDiveDirection == 0
+                ? (state.keeperVerticalJump ? 4 : 1)
+                : 4;
+        return isPointInsideKeeperSensorBoxAt(
+                state.keeperTargetX,
+                state.keeperTargetY,
+                state.keeperDiveDirection,
+                logicalFrame,
+                state.targetX,
+                state.targetY
+        );
+    }
+
+    private void updateMultiplayer(
+            StackPane root,
+            ImageView ball,
+            ImageView keeper,
+            KeeperAnimator keeperAnimator,
+            Rectangle keeperBoxOverlay,
+            Text goalText,
+            Text roleText,
+            Text scoreText,
+            Text shotText,
+            Text hintText,
+            Rectangle resultOverlay,
+            VBox resultBox,
+            Text resultTitle,
+            Text resultDetail,
+            MultiplayerState state,
+            Runnable resetRound,
+            double deltaSeconds
+    ) {
+        updateGoalText(goalText, state, deltaSeconds);
+        if (state.gameOver) {
+            return;
+        }
+
+        if (state.roundResolving) {
+            state.roundResolveTimer -= deltaSeconds;
+            if (state.roundResolveTimer <= 0) {
+                finishMultiplayerShot(
+                        state,
+                        roleText,
+                        scoreText,
+                        shotText,
+                        hintText,
+                        resultOverlay,
+                        resultBox,
+                        resultTitle,
+                        resultDetail,
+                        resetRound,
+                        ball
+                );
+            }
+            return;
+        }
+
+        double motionDeltaSeconds = consumeRetroMotionDelta(state, deltaSeconds);
+        if (motionDeltaSeconds > 0) {
+            keeperAnimator.update(motionDeltaSeconds);
+            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+
+            if (keeperAnimator.consumeDiveFallEvent()) {
+                if (state.keeperDiveDirection != 0 || state.keeperVerticalJump) {
+                    startKeeperDiveFall(root, keeper, state);
+                }
+            }
+
+            if (keeperAnimator.consumeCatchBallHideEvent()) {
+                ball.setVisible(false);
+                state.ballMoving = false;
+                state.phase = MultiplayerPhase.ROUND_DELAY;
+                updateMultiplayerTexts(roleText, scoreText, shotText, hintText, state);
+                queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
+            }
+
+            if (state.keeperFallingAfterCatch) {
+                updateKeeperDiveFall(keeper, state, motionDeltaSeconds);
+                updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+            }
+
+            if (state.keeperMoving) {
+                updateKeeperJumpMovement(root, keeper, state, motionDeltaSeconds);
+                updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+            }
+        }
+
+        if (state.awaitingKeeperAnimationFinish) {
+            if (keeperAnimator.isSequenceFinished() && !state.keeperFallingAfterCatch) {
+                beginRoundResolution(state, state.pendingRoundResult);
+            }
+            return;
+        }
+
+        if (state.phase != MultiplayerPhase.EXECUTING || !state.ballMoving || motionDeltaSeconds <= 0) {
+            return;
+        }
+
+        double ballCenterX = getCenterX(ball);
+        double ballCenterY = getCenterY(ball);
+        double distanceToTarget = Math.hypot(state.targetX - ballCenterX, state.targetY - ballCenterY);
+        double step = state.shotSpeed * motionDeltaSeconds;
+        boolean reachedTarget = distanceToTarget <= step;
+        if (reachedTarget) {
+            setCenterForMotion(ball, state.targetX, state.targetY);
+        } else {
+            setCenterForMotion(
+                    ball,
+                    ballCenterX + (state.targetX - ballCenterX) / distanceToTarget * step,
+                    ballCenterY + (state.targetY - ballCenterY) / distanceToTarget * step
+            );
+        }
+        updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
+
+        double width = root.getWidth();
+        double height = root.getHeight();
+        boolean outsideScreen = getCenterX(ball) < -80
+                || getCenterX(ball) > width + 80
+                || getCenterY(ball) < -80
+                || getCenterY(ball) > height + 80;
+
+        if (reachedTarget && isShotSavedByKeeper(keeper, keeperAnimator, state)) {
+            state.ballMoving = false;
+            return;
+        }
+
+        if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            state.phase = MultiplayerPhase.ROUND_DELAY;
+            hintText.setText("GOAL UNTUK PLAYER " + state.shooterPlayer + ". Tunggu ronde berikutnya.");
+            triggerGoalText(goalText, state);
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
+            return;
+        }
+
+        if (outsideScreen || reachedTarget) {
+            state.phase = MultiplayerPhase.ROUND_DELAY;
+            hintText.setText("BOLA MELESET. Tunggu ronde berikutnya.");
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_MISS);
+        }
+    }
+
+    private void finishMultiplayerShot(
+            MultiplayerState state,
+            Text roleText,
+            Text scoreText,
+            Text shotText,
+            Text hintText,
+            Rectangle resultOverlay,
+            VBox resultBox,
+            Text resultTitle,
+            Text resultDetail,
+            Runnable resetRound,
+            ImageView ball
+    ) {
+        int result = state.roundResult;
+        state.roundResolving = false;
+        state.awaitingKeeperAnimationFinish = false;
+        state.pendingRoundResult = ROUND_RESULT_NONE;
+        state.roundResult = ROUND_RESULT_NONE;
+        state.roundResolveTimer = 0;
+        state.ballMoving = false;
+        state.dragging = false;
+        state.keeperMoving = false;
+        state.keeperFallingAfterCatch = false;
+
+        boolean goal = result == ROUND_RESULT_GOAL;
+        recordMultiplayerShotResult(state, goal);
+        if (goal) {
+            if (state.shooterPlayer == 1) {
+                state.playerOneGoals++;
+            } else {
+                state.playerTwoGoals++;
+            }
+        }
+
+        if (state.shooterPlayer == 1) {
+            state.playerOneShots++;
+        } else {
+            state.playerTwoShots++;
+        }
+
+        if (state.playerOneShots >= MULTIPLAYER_SHOTS_PER_PLAYER
+                && state.playerTwoShots >= MULTIPLAYER_SHOTS_PER_PLAYER) {
+            state.gameOver = true;
+            state.phase = MultiplayerPhase.GAME_OVER;
+            ball.setCursor(Cursor.DEFAULT);
+            updateMultiplayerTexts(roleText, scoreText, shotText, hintText, state);
+
+            if (state.playerOneGoals > state.playerTwoGoals) {
+                resultTitle.setText("PLAYER 1 MENANG");
+            } else if (state.playerTwoGoals > state.playerOneGoals) {
+                resultTitle.setText("PLAYER 2 MENANG");
+            } else {
+                resultTitle.setText("HASIL SERI");
+            }
+            resultDetail.setText("PLAYER 1: " + state.playerOneGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
+                    + "\nPLAYER 2: " + state.playerTwoGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
+                    + "\nSkor lebih banyak menang.");
+            resultOverlay.setVisible(true);
+            resultBox.setVisible(true);
+            return;
+        }
+
+        if (state.shooterPlayer == 1) {
+            state.shooterPlayer = 2;
+            state.keeperPlayer = 1;
+        } else {
+            state.shooterPlayer = 1;
+            state.keeperPlayer = 2;
+        }
+        state.phase = MultiplayerPhase.KICKER_AIM;
+        state.playerTagFadeTimerSeconds = 0;
+        resetRound.run();
+    }
+
     private void updateTournament(
             StackPane root,
             ImageView ball,
             ImageView keeper,
             KeeperAnimator keeperAnimator,
+            Text goalText,
             Rectangle resultOverlay,
             VBox resultBox,
             Text resultTitle,
@@ -1419,41 +2462,9 @@ private Image createFallbackImage() {
             Runnable resetRound,
             double deltaSeconds
     ) {
+        updateGoalText(goalText, state, deltaSeconds);
         if (state.gameOver || state.roundFinished) {
             return;
-        }
-
-        keeperAnimator.update(deltaSeconds);
-
-        if (keeperAnimator.consumeDiveFallEvent()) {
-            if (state.keeperDiveDirection != 0) {
-                startKeeperDiveFall(root, keeper, state);
-            }
-        }
-
-        if (keeperAnimator.consumeCatchBallHideEvent()) {
-            ball.setVisible(false);
-            state.ballMoving = false;
-            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
-        }
-
-        if (state.keeperFallingAfterCatch) {
-            updateKeeperDiveFall(keeper, state, deltaSeconds);
-        }
-
-        if (state.keeperMoving) {
-            double keeperCenterX = getCenterX(keeper);
-            double keeperCenterY = getCenterY(keeper);
-            double dx = state.keeperTargetX - keeperCenterX;
-            double dy = state.keeperTargetY - keeperCenterY;
-            double distance = Math.hypot(dx, dy);
-            double step = (KEEPER_MOVE_SPEED + state.roundIndex * 45) * deltaSeconds;
-            if (distance <= step) {
-                setCenter(keeper, state.keeperTargetX, state.keeperTargetY);
-                state.keeperMoving = false;
-            } else {
-                setCenter(keeper, keeperCenterX + dx / distance * step, keeperCenterY + dy / distance * step);
-            }
         }
 
         if (state.roundResolving) {
@@ -1476,6 +2487,31 @@ private Image createFallbackImage() {
             return;
         }
 
+        double motionDeltaSeconds = consumeRetroMotionDelta(state, deltaSeconds);
+        if (motionDeltaSeconds > 0) {
+            keeperAnimator.update(motionDeltaSeconds);
+
+            if (keeperAnimator.consumeDiveFallEvent()) {
+                if (state.keeperDiveDirection != 0 || state.keeperVerticalJump) {
+                    startKeeperDiveFall(root, keeper, state);
+                }
+            }
+
+            if (keeperAnimator.consumeCatchBallHideEvent()) {
+                ball.setVisible(false);
+                state.ballMoving = false;
+                queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
+            }
+
+            if (state.keeperFallingAfterCatch) {
+                updateKeeperDiveFall(keeper, state, motionDeltaSeconds);
+            }
+
+            if (state.keeperMoving) {
+                updateKeeperJumpMovement(root, keeper, state, motionDeltaSeconds);
+            }
+        }
+
         if (state.awaitingKeeperAnimationFinish) {
             if (keeperAnimator.isSequenceFinished() && !state.keeperFallingAfterCatch) {
                 beginRoundResolution(state, state.pendingRoundResult);
@@ -1483,24 +2519,26 @@ private Image createFallbackImage() {
             return;
         }
 
-        if (!state.ballMoving) {
+        if (!state.ballMoving || motionDeltaSeconds <= 0) {
             return;
         }
 
         double ballCenterX = getCenterX(ball);
         double ballCenterY = getCenterY(ball);
         double distanceToTarget = Math.hypot(state.targetX - ballCenterX, state.targetY - ballCenterY);
-        double step = state.shotSpeed * deltaSeconds;
+        double step = state.shotSpeed * motionDeltaSeconds;
         boolean reachedTarget = distanceToTarget <= step;
         if (reachedTarget) {
-            setCenter(ball, state.targetX, state.targetY);
+            setCenterForMotion(ball, state.targetX, state.targetY);
         } else {
-            setCenter(
+            setCenterForMotion(
                     ball,
                     ballCenterX + (state.targetX - ballCenterX) / distanceToTarget * step,
                     ballCenterY + (state.targetY - ballCenterY) / distanceToTarget * step
             );
         }
+        updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
 
         double width = root.getWidth();
         double height = root.getHeight();
@@ -1515,6 +2553,7 @@ private Image createFallbackImage() {
         }
 
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            triggerGoalText(goalText, state);
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
             return;
         }
@@ -1619,6 +2658,7 @@ private Image createFallbackImage() {
             ImageView keeper,
             KeeperAnimator keeperAnimator,
             Rectangle keeperBoxOverlay,
+            Text goalText,
             Text scoreText,
             Text livesText,
             Rectangle[] lifeIndicators,
@@ -1631,44 +2671,9 @@ private Image createFallbackImage() {
             Runnable resetRound,
             double deltaSeconds
     ) {
+        updateGoalText(goalText, state, deltaSeconds);
         if (state.gameOver) {
             return;
-        }
-
-        keeperAnimator.update(deltaSeconds);
-        updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
-
-        if (keeperAnimator.consumeDiveFallEvent()) {
-            if (state.keeperDiveDirection != 0) {
-                startKeeperDiveFall(root, keeper, state);
-            }
-        }
-
-        if (keeperAnimator.consumeCatchBallHideEvent()) {
-            ball.setVisible(false);
-            state.ballMoving = false;
-            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
-        }
-
-        if (state.keeperFallingAfterCatch) {
-            updateKeeperDiveFall(keeper, state, deltaSeconds);
-            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
-        }
-
-        if (state.keeperMoving) {
-            double keeperCenterX = getCenterX(keeper);
-            double keeperCenterY = getCenterY(keeper);
-            double dx = state.keeperTargetX - keeperCenterX;
-            double dy = state.keeperTargetY - keeperCenterY;
-            double distance = Math.hypot(dx, dy);
-            double step = KEEPER_MOVE_SPEED * deltaSeconds;
-            if (distance <= step) {
-                setCenter(keeper, state.keeperTargetX, state.keeperTargetY);
-                state.keeperMoving = false;
-            } else {
-                setCenter(keeper, keeperCenterX + dx / distance * step, keeperCenterY + dy / distance * step);
-            }
-            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
         }
 
         if (state.roundResolving) {
@@ -1691,6 +2696,34 @@ private Image createFallbackImage() {
             return;
         }
 
+        double motionDeltaSeconds = consumeRetroMotionDelta(state, deltaSeconds);
+        if (motionDeltaSeconds > 0) {
+            keeperAnimator.update(motionDeltaSeconds);
+            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+
+            if (keeperAnimator.consumeDiveFallEvent()) {
+                if (state.keeperDiveDirection != 0 || state.keeperVerticalJump) {
+                    startKeeperDiveFall(root, keeper, state);
+                }
+            }
+
+            if (keeperAnimator.consumeCatchBallHideEvent()) {
+                ball.setVisible(false);
+                state.ballMoving = false;
+                queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
+            }
+
+            if (state.keeperFallingAfterCatch) {
+                updateKeeperDiveFall(keeper, state, motionDeltaSeconds);
+                updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+            }
+
+            if (state.keeperMoving) {
+                updateKeeperJumpMovement(root, keeper, state, motionDeltaSeconds);
+                updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+            }
+        }
+
         if (state.awaitingKeeperAnimationFinish) {
             if (keeperAnimator.isSequenceFinished() && !state.keeperFallingAfterCatch) {
                 beginRoundResolution(state, state.pendingRoundResult);
@@ -1698,24 +2731,26 @@ private Image createFallbackImage() {
             return;
         }
 
-        if (!state.ballMoving) {
+        if (!state.ballMoving || motionDeltaSeconds <= 0) {
             return;
         }
 
         double ballCenterX = getCenterX(ball);
         double ballCenterY = getCenterY(ball);
         double distanceToTarget = Math.hypot(state.targetX - ballCenterX, state.targetY - ballCenterY);
-        double step = state.shotSpeed * deltaSeconds;
+        double step = state.shotSpeed * motionDeltaSeconds;
         boolean reachedTarget = distanceToTarget <= step;
         if (distanceToTarget <= step) {
-            setCenter(ball, state.targetX, state.targetY);
+            setCenterForMotion(ball, state.targetX, state.targetY);
         } else {
-            setCenter(
+            setCenterForMotion(
                     ball,
                     ballCenterX + (state.targetX - ballCenterX) / distanceToTarget * step,
                     ballCenterY + (state.targetY - ballCenterY) / distanceToTarget * step
             );
         }
+        updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
 
         double width = root.getWidth();
         double height = root.getHeight();
@@ -1730,6 +2765,7 @@ private Image createFallbackImage() {
         }
 
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            triggerGoalText(goalText, state);
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
             return;
         }
@@ -1740,15 +2776,29 @@ private Image createFallbackImage() {
     }
 
     private void startKeeperDiveFall(StackPane root, ImageView keeper, EndlessState state) {
-        // Frame 4 adalah titik ayunan/lompatan. Setelah frame ini keeper selalu turun
-        // sambil tetap geser ke arah lompatan, baik bola tertangkap maupun tidak.
+        // Setelah keeper meloncat, keeper turun lagi ke tanah pada alur yang membulat,
+        // bukan berhenti lalu geser balik ke posisi awal.
         state.keeperMoving = false;
         state.keeperFallingAfterCatch = true;
 
-        double direction = state.keeperDiveDirection == 0 ? 0 : Math.signum(state.keeperDiveDirection);
         double currentX = getCenterX(keeper);
         double currentY = getCenterY(keeper);
+        state.keeperFallStartX = currentX;
+        state.keeperFallStartY = currentY;
+        state.keeperFallElapsedSeconds = 0;
+        state.keeperRetroAccumulatorSeconds = 0;
 
+        if (state.keeperVerticalJump) {
+            state.keeperFallTargetX = currentX;
+            state.keeperFallTargetY = Math.max(
+                    currentY,
+                    root.getHeight() * KEEPER_START_CENTER_Y_RATIO
+            );
+            state.keeperFallArcHeight = 0;
+            return;
+        }
+
+        double direction = state.keeperDiveDirection == 0 ? 0 : Math.signum(state.keeperDiveDirection);
         double fallSideDistance = KEEPER_SIZE * KEEPER_CATCH_FALL_SIDE_RATIO;
         state.keeperFallTargetX = clamp(
                 currentX + direction * fallSideDistance,
@@ -1762,6 +2812,10 @@ private Image createFallbackImage() {
                 currentY,
                 fallTargetY
         );
+        state.keeperFallArcHeight = Math.max(
+                KEEPER_SIZE * 0.08,
+                Math.abs(state.keeperFallTargetX - currentX) * KEEPER_FALL_ARC_HEIGHT_RATIO
+        );
     }
 
     private void updateKeeperDiveFall(
@@ -1769,24 +2823,32 @@ private Image createFallbackImage() {
             EndlessState state,
             double deltaSeconds
     ) {
-        double keeperCenterX = getCenterX(keeper);
-        double keeperCenterY = getCenterY(keeper);
-        double dx = state.keeperFallTargetX - keeperCenterX;
-        double dy = state.keeperFallTargetY - keeperCenterY;
-        double distance = Math.hypot(dx, dy);
-        double step = KEEPER_CATCH_FALL_SPEED * deltaSeconds;
+        state.keeperFallElapsedSeconds += deltaSeconds;
 
-        if (distance <= step || distance <= 1.0) {
-            setCenter(keeper, state.keeperFallTargetX, state.keeperFallTargetY);
-            state.keeperFallingAfterCatch = false;
-            return;
+        double progress = clamp(
+                state.keeperFallElapsedSeconds / KEEPER_FALL_TO_GROUND_SECONDS,
+                0,
+                1
+        );
+
+        double x;
+        double y;
+        if (state.keeperVerticalJump) {
+            x = state.keeperFallStartX;
+            y = lerp(state.keeperFallStartY, state.keeperFallTargetY, easeInQuad(progress));
+        } else {
+            double xProgress = easeOutQuad(progress);
+            double baseY = lerp(state.keeperFallStartY, state.keeperFallTargetY, easeInQuad(progress));
+            x = lerp(state.keeperFallStartX, state.keeperFallTargetX, xProgress);
+            y = baseY - state.keeperFallArcHeight * Math.sin(Math.PI * progress) * 0.40;
         }
 
-        setCenter(
-                keeper,
-                keeperCenterX + dx / distance * step,
-                keeperCenterY + dy / distance * step
-        );
+        setCenter(keeper, snapToRetro(x), snapToRetro(y));
+
+        if (progress >= 1.0) {
+            setCenter(keeper, snapToRetro(state.keeperFallTargetX), snapToRetro(state.keeperFallTargetY));
+            state.keeperFallingAfterCatch = false;
+        }
     }
 
     private void beginRoundResolution(EndlessState state, int roundResult) {
@@ -1794,6 +2856,7 @@ private Image createFallbackImage() {
         state.dragging = false;
         state.keeperMoving = false;
         state.keeperFallingAfterCatch = false;
+        state.keeperReturningToIdle = false;
         state.roundResolving = true;
         state.roundResult = roundResult;
         state.roundResolveTimer = ROUND_RESULT_DELAY_SECONDS;
@@ -1930,7 +2993,9 @@ private Image createFallbackImage() {
         state.dragging = false;
         state.keeperMoving = false;
         state.keeperFallingAfterCatch = false;
+        state.keeperReturningToIdle = false;
         state.keeperJumping = false;
+        state.keeperVerticalJump = false;
         state.keeperWillCatch = false;
         state.keeperDiveDirection = 0;
         state.roundResolving = false;
@@ -1938,6 +3003,15 @@ private Image createFallbackImage() {
         state.pendingRoundResult = ROUND_RESULT_NONE;
         state.roundResult = ROUND_RESULT_NONE;
         state.roundResolveTimer = 0;
+        state.goalTextTimerSeconds = 0;
+        state.keeperFallElapsedSeconds = 0;
+        state.keeperMoveElapsedSeconds = 0;
+        state.keeperMoveDurationSeconds = 0;
+        state.keeperMoveArcHeight = 0;
+        state.keeperFallArcHeight = 0;
+        state.keeperRetroAccumulatorSeconds = 0;
+        state.ballRetroAccumulatorSeconds = 0;
+        state.retroMotionAccumulatorSeconds = 0;
         state.velocityX = 0;
         state.velocityY = 0;
         state.shotSpeed = 0;
@@ -1947,6 +3021,8 @@ private Image createFallbackImage() {
         state.targetY = state.anchorY;
 
         ball.setVisible(true);
+        ball.setRotate(0);
+        resetBallPerspective(ball);
         setCenter(ball, state.anchorX, state.anchorY);
         setKeeperToIdlePosition(root, keeper);
         keeperAnimator.showIdle();
@@ -2046,9 +3122,34 @@ private Image createFallbackImage() {
 
         if (ballDirection == 0) {
             state.keeperTargetX = centerX;
+            boolean upperCenterShot = state.targetY < centerY - root.getHeight() * 0.045;
+
+            if (upperCenterShot) {
+                // Tendangan tengah yang naik memakai animasi loncat vertikal.
+                // Jika terbaca, pakai folder "loncat tangkap". Jika tidak, pakai folder "loncat" saja.
+                state.keeperVerticalJump = true;
+                state.keeperDiveDirection = 0;
+                if (state.keeperWillCatch) {
+                    state.keeperTargetY = clamp(
+                            state.targetY - getKeeperSensorOffsetY(0),
+                            minCenterY,
+                            maxCenterY
+                    );
+                } else {
+                    state.keeperTargetY = clamp(
+                            Math.min(centerY - KEEPER_SIZE * 0.16, state.targetY + KEEPER_SIZE * 0.24),
+                            minCenterY,
+                            maxCenterY
+                    );
+                }
+                state.keeperJumping = true;
+                configureKeeperJumpMotion(root, state, centerX, centerY);
+                return;
+            }
+
+            state.keeperVerticalJump = false;
             if (state.keeperWillCatch) {
-                // Tendangan lurus ke atas tetap bisa dibaca keeper.
-                // Center Y diarahkan ke titik bola, bukan dikunci di posisi berdiri.
+                // Tendangan lurus rendah tetap bisa dibaca keeper dengan pose tangkap berdiri.
                 state.keeperTargetY = clamp(
                         state.targetY - getKeeperSensorOffsetY(0),
                         minCenterY,
@@ -2059,8 +3160,13 @@ private Image createFallbackImage() {
             }
             state.keeperJumping = Math.hypot(state.keeperTargetX - centerX, state.keeperTargetY - centerY) > 18;
             state.keeperDiveDirection = resolveKeeperAnimationDirection(centerX, state.keeperTargetX, ballDirection, sideThreshold);
+            if (state.keeperJumping) {
+                configureKeeperJumpMotion(root, state, centerX, centerY);
+            }
             return;
         }
+
+        state.keeperVerticalJump = false;
 
         int direction = ballDirection;
         double catchCenterY = clamp(
@@ -2113,6 +3219,9 @@ private Image createFallbackImage() {
 
         state.keeperJumping = Math.hypot(state.keeperTargetX - centerX, state.keeperTargetY - centerY) > 18;
         state.keeperDiveDirection = resolveKeeperAnimationDirection(centerX, state.keeperTargetX, ballDirection, sideThreshold);
+        if (state.keeperJumping) {
+            configureKeeperJumpMotion(root, state, centerX, centerY);
+        }
     }
 
     private int resolveKeeperAnimationDirection(double startX, double targetX, int fallbackDirection, double sideThreshold) {
@@ -2233,6 +3342,183 @@ private Image createFallbackImage() {
         state.scoredShotsLearned++;
     }
 
+    private void startKeeperJumpMovement(StackPane root, ImageView keeper, EndlessState state, double speed) {
+        state.keeperMoving = state.keeperJumping;
+        if (!state.keeperMoving) {
+            return;
+        }
+        configureKeeperJumpMotion(root, state, getCenterX(keeper), getCenterY(keeper), speed);
+    }
+
+    private void configureKeeperJumpMotion(StackPane root, EndlessState state, double startX, double startY) {
+        configureKeeperJumpMotion(root, state, startX, startY, KEEPER_MOVE_SPEED);
+    }
+
+    private void configureKeeperJumpMotion(StackPane root, EndlessState state, double startX, double startY, double speed) {
+        state.keeperMoveStartX = startX;
+        state.keeperMoveStartY = startY;
+        state.keeperMoveElapsedSeconds = 0;
+        state.keeperRetroAccumulatorSeconds = 0;
+
+        double moveDistance = Math.hypot(state.keeperTargetX - startX, state.keeperTargetY - startY);
+        if (state.keeperVerticalJump || state.keeperDiveDirection == 0) {
+            state.keeperMoveDurationSeconds = Math.max(KEEPER_FRAME_SECONDS * 1.5, moveDistance / Math.max(speed, 1));
+            state.keeperMoveArcHeight = 0;
+            return;
+        }
+
+        // Untuk dive samping, durasi dibuat berbasis waktu agar alurnya membentuk busur,
+        // bukan garis lurus naik-turun yang terlihat seperti segitiga.
+        state.keeperMoveDurationSeconds = KEEPER_SIDE_DIVE_ARC_SECONDS;
+        double horizontalDistance = Math.abs(state.keeperTargetX - startX);
+        double verticalRise = Math.max(0, startY - state.keeperTargetY);
+        state.keeperMoveArcHeight = Math.max(
+                KEEPER_SIZE * 0.10,
+                horizontalDistance * KEEPER_SIDE_DIVE_ARC_HEIGHT_RATIO + verticalRise * 0.35
+        );
+    }
+
+    private void updateKeeperJumpMovement(StackPane root, ImageView keeper, EndlessState state, double deltaSeconds) {
+        state.keeperMoveElapsedSeconds += deltaSeconds;
+        double progress = clamp(
+                state.keeperMoveElapsedSeconds / Math.max(state.keeperMoveDurationSeconds, 0.0001),
+                0,
+                1
+        );
+
+        double x;
+        double y;
+        if (state.keeperVerticalJump || state.keeperDiveDirection == 0) {
+            x = lerp(state.keeperMoveStartX, state.keeperTargetX, easeOutQuad(progress));
+            y = lerp(state.keeperMoveStartY, state.keeperTargetY, easeOutQuad(progress));
+        } else {
+            double moveProgress = easeInOutSine(progress);
+            double baseY = lerp(state.keeperMoveStartY, state.keeperTargetY, moveProgress);
+            x = lerp(state.keeperMoveStartX, state.keeperTargetX, moveProgress);
+            y = baseY - state.keeperMoveArcHeight * Math.sin(Math.PI * progress);
+        }
+
+        setCenterForMotion(keeper, x, y);
+
+        if (progress >= 1.0) {
+            setCenterForMotion(keeper, state.keeperTargetX, state.keeperTargetY);
+            state.keeperMoving = false;
+        }
+    }
+
+    private double consumeRetroMotionDelta(EndlessState state, double deltaSeconds) {
+        if (!RETRO_MOTION_ENABLED) {
+            return deltaSeconds;
+        }
+        state.retroMotionAccumulatorSeconds = Math.min(
+                state.retroMotionAccumulatorSeconds + deltaSeconds,
+                (1.0 / RETRO_MOTION_FPS) * 3
+        );
+        if (state.retroMotionAccumulatorSeconds < RETRO_MOTION_STEP_SECONDS) {
+            return 0;
+        }
+        double step = state.retroMotionAccumulatorSeconds;
+        state.retroMotionAccumulatorSeconds = 0;
+        return step;
+    }
+
+    private void setCenterForMotion(ImageView imageView, double centerX, double centerY) {
+        setCenter(imageView, snapToRetro(centerX), snapToRetro(centerY));
+    }
+
+
+    private Text createGoalText(StackPane root) {
+        Text goalText = new Text("GOOOAL!");
+        goalText.setFill(Color.rgb(255, 224, 64));
+        goalText.setStroke(Color.rgb(25, 12, 0, 0.92));
+        goalText.setStrokeWidth(4.5);
+        goalText.setFont(loadFont(START_FONT_PATH, 82, Font.font("Arial", FontWeight.EXTRA_BOLD, 82)));
+        goalText.setMouseTransparent(true);
+        goalText.setVisible(false);
+        goalText.setOpacity(0);
+        goalText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - goalText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                goalText.layoutBoundsProperty()
+        ));
+        goalText.layoutYProperty().bind(root.heightProperty().multiply(0.24));
+        return goalText;
+    }
+
+    private void triggerGoalText(Text goalText, EndlessState state) {
+        if (goalText == null) {
+            return;
+        }
+        state.goalTextTimerSeconds = GOAL_TEXT_DURATION_SECONDS;
+        goalText.setVisible(true);
+        goalText.setOpacity(1);
+        goalText.setScaleX(0.72);
+        goalText.setScaleY(0.72);
+        goalText.setRotate(-2);
+    }
+
+    private void updateGoalText(Text goalText, EndlessState state, double deltaSeconds) {
+        if (goalText == null) {
+            return;
+        }
+        if (state.goalTextTimerSeconds <= 0) {
+            goalText.setOpacity(0);
+            goalText.setVisible(false);
+            return;
+        }
+
+        state.goalTextTimerSeconds = Math.max(0, state.goalTextTimerSeconds - deltaSeconds);
+        double elapsed = GOAL_TEXT_DURATION_SECONDS - state.goalTextTimerSeconds;
+        double popProgress = clamp(elapsed / GOAL_TEXT_POP_SECONDS, 0, 1);
+        double fadeOut = clamp(state.goalTextTimerSeconds / GOAL_TEXT_FADE_OUT_SECONDS, 0, 1);
+        double opacity = Math.min(1, popProgress * 1.35) * fadeOut;
+        double pulse = Math.sin(elapsed * 18.0) * 0.025;
+        double scale = 0.72 + 0.42 * easeOutQuad(popProgress) + pulse;
+
+        goalText.setVisible(true);
+        goalText.setOpacity(opacity);
+        goalText.setScaleX(scale);
+        goalText.setScaleY(scale);
+        goalText.setRotate(-2 + Math.sin(elapsed * 12.0) * 2.0);
+
+        if (state.goalTextTimerSeconds <= 0) {
+            goalText.setOpacity(0);
+            goalText.setVisible(false);
+            goalText.setScaleX(1);
+            goalText.setScaleY(1);
+            goalText.setRotate(0);
+        }
+    }
+
+    private void resetBallPerspective(ImageView ball) {
+        ball.setScaleX(1.0);
+        ball.setScaleY(1.0);
+    }
+
+    private void updateBallPerspectiveScale(ImageView ball, EndlessState state) {
+        double totalDistance = Math.hypot(state.targetX - state.anchorX, state.targetY - state.anchorY);
+        if (totalDistance <= 1) {
+            resetBallPerspective(ball);
+            return;
+        }
+
+        double currentDistance = Math.hypot(getCenterX(ball) - state.anchorX, getCenterY(ball) - state.anchorY);
+        double progress = clamp(currentDistance / totalDistance, 0, 1);
+        double easedProgress = Math.pow(progress, BALL_PERSPECTIVE_CURVE);
+        double scale = lerp(1.0, BALL_MIN_PERSPECTIVE_SCALE, easedProgress);
+        ball.setScaleX(scale);
+        ball.setScaleY(scale);
+    }
+
+    private void updateBallRetroRotation(ImageView ball, EndlessState state, double deltaSeconds) {
+        double direction = state.velocityX >= 0 ? 1.0 : -1.0;
+        double rotation = ball.getRotate() + direction * BALL_RETRO_ROTATION_DEGREES_PER_SECOND * deltaSeconds;
+        if (RETRO_MOTION_ENABLED) {
+            rotation = Math.round(rotation / BALL_ROTATION_SNAP_DEGREES) * BALL_ROTATION_SNAP_DEGREES;
+        }
+        ball.setRotate(rotation);
+    }
+
     private double randomBetween(double min, double max) {
         if (max <= min) {
             return min;
@@ -2242,6 +3528,29 @@ private Image createFallbackImage() {
 
     private double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private double lerp(double start, double end, double progress) {
+        return start + (end - start) * progress;
+    }
+
+    private double easeOutQuad(double progress) {
+        return 1 - Math.pow(1 - progress, 2);
+    }
+
+    private double easeInQuad(double progress) {
+        return progress * progress;
+    }
+
+    private double easeInOutSine(double progress) {
+        return -(Math.cos(Math.PI * progress) - 1) / 2.0;
+    }
+
+    private double snapToRetro(double value) {
+        if (!RETRO_MOTION_ENABLED) {
+            return value;
+        }
+        return Math.round(value / RETRO_PIXEL_SNAP) * RETRO_PIXEL_SNAP;
     }
 
     private void applyKickForce(StackPane root, ImageView ball, EndlessState state) {
@@ -2260,6 +3569,7 @@ private Image createFallbackImage() {
         state.shotSpeed = shot.speed;
         state.targetX = state.anchorX + shot.directionX * shot.distance;
         state.targetY = state.anchorY + shot.directionY * shot.distance;
+        state.retroMotionAccumulatorSeconds = 0;
     }
 
     private void updateTargetMarker(StackPane root, ImageView ball, Circle targetMarker, EndlessState state) {
@@ -2282,7 +3592,7 @@ private Image createFallbackImage() {
 
     private Shot calculateShot(StackPane root, double pullX, double pullY, double pullDistance) {
         double power = Math.min(1.0, pullDistance / MAX_PULL_DISTANCE);
-        double tunedPower = Math.pow(power, 0.92);
+        double tunedPower = Math.pow(power, SHOT_POWER_CURVE);
         double directionX = pullX / pullDistance;
         double directionY = pullY / pullDistance;
 
@@ -2294,7 +3604,7 @@ private Image createFallbackImage() {
         }
 
         double goalDistance = Math.abs(getGoalLineY(root) - getBallStartY(root));
-        double maxDistance = Math.max(MAX_SHOT_DISTANCE, goalDistance * 1.85);
+        double maxDistance = Math.max(MAX_SHOT_DISTANCE, goalDistance * SHOT_DISTANCE_GOAL_MULTIPLIER);
         double distance = MIN_SHOT_DISTANCE + (maxDistance - MIN_SHOT_DISTANCE) * tunedPower;
         double speed = MIN_BALL_SPEED + (MAX_BALL_SPEED - MIN_BALL_SPEED) * tunedPower;
 
@@ -2360,6 +3670,7 @@ private Image createFallbackImage() {
         private boolean sequenceFinished;
         private double finalFrameHoldTimer;
         private boolean catchBall;
+        private boolean verticalJump;
         private boolean catchBallHideEventPending;
         private boolean catchBallHideEventFired;
         private boolean diveFallEventPending;
@@ -2379,6 +3690,7 @@ private Image createFallbackImage() {
             playing = false;
             sequenceFinished = false;
             catchBall = false;
+            verticalJump = false;
             catchBallHideEventPending = false;
             catchBallHideEventFired = false;
             diveFallEventPending = false;
@@ -2394,15 +3706,16 @@ private Image createFallbackImage() {
             applyFrameVisualOffset();
         }
 
-        private void startDive(int direction, boolean catchBall) {
+        private void startDive(int direction, boolean catchBall, boolean verticalJump) {
             this.catchBall = catchBall;
+            this.verticalJump = verticalJump;
             this.catchBallHideEventPending = false;
             this.catchBallHideEventFired = false;
             this.diveFallEventPending = false;
             this.diveFallEventFired = false;
             this.sequenceFinished = false;
             this.finalFrameHoldTimer = 0;
-            DiveFrameSequence sequence = buildDiveFrames(direction, catchBall);
+            DiveFrameSequence sequence = buildDiveFrames(direction, catchBall, verticalJump);
             frames = sequence.images;
             logicalFrameNumbers = sequence.logicalFrameNumbers;
             frameIndex = 0;
@@ -2464,6 +3777,9 @@ private Image createFallbackImage() {
 
         private double getCurrentFrameDuration() {
             int logicalFrame = getCurrentLogicalFrameNumber();
+            if (verticalJump && logicalFrame >= 7) {
+                return KEEPER_FRAME_SECONDS;
+            }
             if (logicalFrame >= 5 && logicalFrame < 7) {
                 return KEEPER_LANDING_FRAME_HOLD_SECONDS;
             }
@@ -2503,13 +3819,36 @@ private Image createFallbackImage() {
             return logicalFrameNumbers.get(Math.max(0, Math.min(frameIndex, logicalFrameNumbers.size() - 1)));
         }
 
-        private DiveFrameSequence buildDiveFrames(int direction, boolean catchBall) {
+        private DiveFrameSequence buildDiveFrames(int direction, boolean catchBall, boolean verticalJump) {
             List<Image> result = new ArrayList<>();
             List<Integer> frameNumbers = new ArrayList<>();
             result.add(idleImage);
             frameNumbers.add(1);
 
             if (direction == 0) {
+                if (verticalJump) {
+                    String primaryFolder = catchBall ? KEEPER_UP_CATCH_FOLDER : KEEPER_UP_FOLDER;
+                    String fallbackFolder = catchBall ? KEEPER_UP_FOLDER : KEEPER_UP_CATCH_FOLDER;
+                    int maxSourceFrame = catchBall ? 3 : 2;
+                    for (int sourceFrame = 1; sourceFrame <= maxSourceFrame; sourceFrame++) {
+                        int fallbackSourceFrame = Math.min(sourceFrame, 2);
+                        result.add(loadKeeperImage(
+                                framePath(primaryFolder, sourceFrame),
+                                framePath(fallbackFolder, fallbackSourceFrame),
+                                KEEPER_IDLE_IMAGE_PATH
+                        ));
+
+                        if (catchBall && sourceFrame == 2) {
+                            frameNumbers.add(4);
+                        } else if (sourceFrame == maxSourceFrame) {
+                            frameNumbers.add(7);
+                        } else {
+                            frameNumbers.add(2);
+                        }
+                    }
+                    return new DiveFrameSequence(result, frameNumbers);
+                }
+
                 if (catchBall) {
                     result.add(standingCatchImage);
                     frameNumbers.add(2);
@@ -2579,12 +3918,36 @@ private Image createFallbackImage() {
         }
     }
 
+
+    private enum MultiplayerPhase {
+        KICKER_AIM,
+        KEEPER_AIM,
+        EXECUTING,
+        ROUND_DELAY,
+        GAME_OVER
+    }
+
+    private static class MultiplayerState extends EndlessState {
+        int playerOneGoals;
+        int playerTwoGoals;
+        int playerOneShots;
+        int playerTwoShots;
+        int shooterPlayer = 1;
+        int keeperPlayer = 2;
+        int[] playerOneShotResults = new int[MULTIPLAYER_SHOTS_PER_PLAYER];
+        int[] playerTwoShotResults = new int[MULTIPLAYER_SHOTS_PER_PLAYER];
+        MultiplayerPhase phase = MultiplayerPhase.KICKER_AIM;
+        double playerTagFadeTimerSeconds;
+    }
+
     private static class EndlessState {
         boolean dragging;
         boolean ballMoving;
         boolean keeperMoving;
         boolean keeperFallingAfterCatch;
+        boolean keeperReturningToIdle;
         boolean keeperJumping;
+        boolean keeperVerticalJump;
         double anchorX;
         double anchorY;
         double velocityX;
@@ -2594,8 +3957,22 @@ private Image createFallbackImage() {
         double shotSpeed;
         double keeperTargetX;
         double keeperTargetY;
+        double keeperFallStartX;
+        double keeperFallStartY;
         double keeperFallTargetX;
         double keeperFallTargetY;
+        double keeperFallElapsedSeconds;
+        double keeperMoveStartX;
+        double keeperMoveStartY;
+        double keeperMoveElapsedSeconds;
+        double keeperMoveDurationSeconds;
+        double keeperMoveArcHeight;
+        double keeperFallArcHeight;
+        double retroMotionAccumulatorSeconds;
+        double keeperRetroAccumulatorSeconds;
+        double ballRetroAccumulatorSeconds;
+        double keeperReturnTargetX;
+        double keeperReturnTargetY;
         double learnedTargetX;
         double learnedTargetY;
         int scoredShotsLearned;
@@ -2604,6 +3981,7 @@ private Image createFallbackImage() {
         int keeperDiveDirection;
         int roundResult;
         double roundResolveTimer;
+        double goalTextTimerSeconds;
         boolean keeperWillCatch;
         boolean roundResolving;
         boolean awaitingKeeperAnimationFinish;
