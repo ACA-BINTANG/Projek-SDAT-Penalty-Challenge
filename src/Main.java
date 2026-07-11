@@ -1,4 +1,7 @@
 import javafx.animation.AnimationTimer;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -21,6 +24,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.AudioClip;
 import javafx.scene.media.MediaView;
 import javafx.scene.effect.BlendMode;
 import javafx.scene.paint.Color;
@@ -31,6 +35,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +50,13 @@ import java.util.Random;
 
 public class Main extends Application {
     private static final String INTRO_VIDEO_PATH = "resources/video/Intro-Awal.mp4";
+    private static final String INTRO_SOUND_PATH = "resources/audio/Sound-Intro.mp3";
+    private static final String INTRO_MUSIC_PATH = "resources/audio/music-intro.MP3";
+    private static final String MENU_AUDIO_PATH = "resources/audio/Sound-Menu.mp3";
+    private static final String MENU_CLICK_AUDIO_PATH = "resources/audio/menu-click.wav";
+    private static final String AUDIO_DEFAULT_PATH = "resources/audio/default.MP3";
+    private static final String AUDIO_GOAL_PATH = "resources/audio/goal.MP3";
+    private static final String AUDIO_MISSED_PATH = "resources/audio/missed.MP3";
     private static final String MENU_BACKGROUND_PATH = "resources/images/Tampilan-BG-Menu.png";
     private static final String MENU_BOX_OFF_PATH = "resources/images/No-selected.png";
     private static final String MENU_BOX_ON_PATH = "resources/images/Selected.png";
@@ -73,6 +85,14 @@ public class Main extends Application {
     private static final double MENU_OPTION_HEIGHT = 59.5;
     private static final double BALL_SIZE = 92;
     private static final double KEEPER_SIZE = 260;
+    private static final double GAME_DEFAULT_AUDIO_VOLUME = 0.42;
+    private static final double GAME_DEFAULT_DUCK_VOLUME = 0.14;
+    private static final double GAME_EFFECT_AUDIO_VOLUME = 0.82;
+    private static final double GAME_AUDIO_CROSSFADE_SECONDS = 0.32;
+    private static final double INTRO_SOUND_VOLUME = 0.88;
+    private static final double INTRO_MUSIC_VOLUME = 0.42;
+    private static final double MENU_AUDIO_VOLUME = 0.38;
+    private static final double MENU_CLICK_AUDIO_VOLUME = 0.45;
 
     // Sensor keeper mengikuti pose sprite hijau.
     // Berdiri = sensor vertikal, lompat kiri/kanan = sensor horizontal.
@@ -156,6 +176,15 @@ public class Main extends Application {
             "IDEA ATHLETIC"
     };
     private MediaPlayer introPlayer;
+    private MediaPlayer introSoundPlayer;
+    private MediaPlayer introMusicPlayer;
+    private MediaPlayer menuAudioPlayer;
+    private AudioClip menuClickAudioClip;
+    private MediaPlayer defaultGameAudioPlayer;
+    private MediaPlayer effectGameAudioPlayer;
+    private Timeline defaultAudioFadeTimeline;
+    private Timeline effectAudioFadeTimeline;
+    private boolean gameplayAudioRequested = false;
     private final Random random = new Random();
 
     @Override
@@ -166,6 +195,7 @@ public class Main extends Application {
         Path videoPath = resolveResource(INTRO_VIDEO_PATH);
         if (!Files.exists(videoPath)) {
             showError(root, "Video tidak ditemukan:\n" + videoPath);
+            startIntroAudio();
         } else {
             try {
                 Media media = new Media(videoPath.toUri().toString());
@@ -175,9 +205,17 @@ public class Main extends Application {
                 mediaPlayer.setOnError(() -> showError(root, "Gagal memutar video:\n" + mediaPlayer.getError()));
                 media.setOnError(() -> showError(root, "Format video tidak bisa dibaca:\n" + media.getError()));
                 mediaPlayer.setOnReady(() -> Platform.runLater(() -> {
-                    mediaPlayer.seek(javafx.util.Duration.ZERO);
+                    mediaPlayer.seek(Duration.ZERO);
                     mediaPlayer.play();
+                    startIntroAudio();
                 }));
+                mediaPlayer.setOnEndOfMedia(() -> {
+                    try {
+                        mediaPlayer.stop();
+                    } catch (Exception exception) {
+                        System.err.println("Gagal stop intro video: " + exception.getMessage());
+                    }
+                });
                 mediaPlayer.statusProperty().addListener((observable, oldStatus, newStatus) ->
                         System.out.println("Intro video status: " + newStatus));
                 introPlayer = mediaPlayer;
@@ -201,9 +239,7 @@ public class Main extends Application {
 
         StackPane startButton = createStartButton();
         startButton.setOnMouseClicked(event -> {
-            if (introPlayer != null) {
-                introPlayer.stop();
-            }
+            stopIntroAudio();
             showMenu(stage);
         });
 
@@ -221,6 +257,15 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    @Override
+    public void stop() {
+        stopGameplayAudio();
+        stopMenuAudio();
+        stopIntroAudio();
+        disposeMediaPlayer(introPlayer);
+        introPlayer = null;
     }
 
 private Path resolveResource(String relativePath) {
@@ -242,6 +287,260 @@ private Path resolveResource(String relativePath) {
         }
 
         return candidates[0];
+    }
+
+    private void startIntroAudio() {
+        if (introSoundPlayer == null) {
+            introSoundPlayer = createAudioPlayer(INTRO_SOUND_PATH, INTRO_SOUND_VOLUME, false);
+        }
+        if (introMusicPlayer == null) {
+            introMusicPlayer = createAudioPlayer(INTRO_MUSIC_PATH, INTRO_MUSIC_VOLUME, true);
+        }
+
+        playFromStart(introSoundPlayer);
+        playFromStart(introMusicPlayer);
+    }
+
+    private void stopIntroAudio() {
+        disposeMediaPlayer(introSoundPlayer);
+        introSoundPlayer = null;
+        disposeMediaPlayer(introMusicPlayer);
+        introMusicPlayer = null;
+        if (introPlayer != null) {
+            try {
+                introPlayer.stop();
+            } catch (Exception exception) {
+                System.err.println("Gagal stop intro video: " + exception.getMessage());
+            }
+            disposeMediaPlayer(introPlayer);
+            introPlayer = null;
+        }
+    }
+
+    private void startMenuAudio() {
+        stopIntroAudio();
+        if (menuAudioPlayer == null) {
+            menuAudioPlayer = createAudioPlayer(MENU_AUDIO_PATH, MENU_AUDIO_VOLUME, true);
+        }
+        if (menuAudioPlayer != null) {
+            try {
+                if (menuAudioPlayer.getStatus() == MediaPlayer.Status.DISPOSED) {
+                    menuAudioPlayer = createAudioPlayer(MENU_AUDIO_PATH, MENU_AUDIO_VOLUME, true);
+                }
+                menuAudioPlayer.setVolume(MENU_AUDIO_VOLUME);
+                menuAudioPlayer.play();
+            } catch (Exception exception) {
+                System.err.println("Gagal play menu audio: " + exception.getMessage());
+            }
+        }
+    }
+
+    private void stopMenuAudio() {
+        disposeMediaPlayer(menuAudioPlayer);
+        menuAudioPlayer = null;
+    }
+
+    private void playMenuClickSound() {
+        try {
+            if (menuClickAudioClip == null) {
+                Path path = resolveResource(MENU_CLICK_AUDIO_PATH);
+                if (!Files.exists(path)) {
+                    return;
+                }
+                menuClickAudioClip = new AudioClip(path.toUri().toString());
+                menuClickAudioClip.setVolume(MENU_CLICK_AUDIO_VOLUME);
+            }
+            menuClickAudioClip.play(MENU_CLICK_AUDIO_VOLUME);
+        } catch (Exception exception) {
+            System.err.println("Gagal play menu click audio: " + exception.getMessage());
+        }
+    }
+
+    private void startGameplayDefaultAudio() {
+        stopMenuAudio();
+        gameplayAudioRequested = true;
+        stopEffectGameAudio(true);
+
+        if (defaultGameAudioPlayer == null) {
+            defaultGameAudioPlayer = createAudioPlayer(AUDIO_DEFAULT_PATH, GAME_DEFAULT_AUDIO_VOLUME, true);
+        }
+
+        if (defaultGameAudioPlayer != null) {
+            try {
+                defaultGameAudioPlayer.setVolume(0.0);
+                defaultGameAudioPlayer.play();
+                fadePlayerVolume(defaultGameAudioPlayer, GAME_DEFAULT_AUDIO_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS, true);
+            } catch (Exception exception) {
+                System.err.println("Gagal play default audio: " + exception.getMessage());
+            }
+        }
+    }
+
+    private void resumeDefaultGameAudioIfNeeded() {
+        if (!gameplayAudioRequested) {
+            return;
+        }
+        if (defaultGameAudioPlayer == null) {
+            defaultGameAudioPlayer = createAudioPlayer(AUDIO_DEFAULT_PATH, 0.0, true);
+        }
+        if (defaultGameAudioPlayer != null) {
+            try {
+                defaultGameAudioPlayer.play();
+                fadePlayerVolume(defaultGameAudioPlayer, GAME_DEFAULT_AUDIO_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS, true);
+            } catch (Exception exception) {
+                System.err.println("Gagal resume default audio: " + exception.getMessage());
+            }
+        }
+    }
+
+    private void playRoundResultAudio(int roundResult) {
+        if (roundResult == ROUND_RESULT_GOAL) {
+            playEffectGameAudio(AUDIO_GOAL_PATH);
+        } else if (roundResult == ROUND_RESULT_MISS || roundResult == ROUND_RESULT_SAVED) {
+            playEffectGameAudio(AUDIO_MISSED_PATH);
+        }
+    }
+
+    private void playEffectGameAudio(String audioPath) {
+        if (!gameplayAudioRequested) {
+            return;
+        }
+
+        if (defaultGameAudioPlayer == null) {
+            defaultGameAudioPlayer = createAudioPlayer(AUDIO_DEFAULT_PATH, GAME_DEFAULT_AUDIO_VOLUME, true);
+        }
+        if (defaultGameAudioPlayer != null) {
+            try {
+                defaultGameAudioPlayer.play();
+                fadePlayerVolume(defaultGameAudioPlayer, GAME_DEFAULT_DUCK_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS, true);
+            } catch (Exception exception) {
+                System.err.println("Gagal duck default audio: " + exception.getMessage());
+            }
+        }
+
+        stopEffectGameAudio(true);
+
+        MediaPlayer player = createAudioPlayer(audioPath, 0.0, false);
+        if (player == null) {
+            resumeDefaultGameAudioIfNeeded();
+            return;
+        }
+
+        effectGameAudioPlayer = player;
+        player.setOnEndOfMedia(() -> {
+            stopEffectGameAudio(true);
+            resumeDefaultGameAudioIfNeeded();
+        });
+        player.setOnError(() -> {
+            System.err.println("Gagal memutar effect audio: " + player.getError());
+            stopEffectGameAudio(true);
+            resumeDefaultGameAudioIfNeeded();
+        });
+
+        try {
+            player.seek(Duration.ZERO);
+            player.play();
+            fadePlayerVolume(player, GAME_EFFECT_AUDIO_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS * 0.60, false);
+        } catch (Exception exception) {
+            System.err.println("Gagal play effect audio: " + exception.getMessage());
+            stopEffectGameAudio(true);
+            resumeDefaultGameAudioIfNeeded();
+        }
+    }
+
+    private MediaPlayer createAudioPlayer(String audioPath, double volume, boolean loop) {
+        Path path = resolveResource(audioPath);
+        if (!Files.exists(path)) {
+            System.err.println("Audio tidak ditemukan: " + path);
+            return null;
+        }
+
+        try {
+            Media media = new Media(path.toUri().toString());
+            MediaPlayer player = new MediaPlayer(media);
+            player.setVolume(volume);
+            player.setCycleCount(loop ? MediaPlayer.INDEFINITE : 1);
+            media.setOnError(() -> System.err.println("Format audio tidak bisa dibaca: " + media.getError()));
+            player.setOnError(() -> System.err.println("MediaPlayer audio error: " + player.getError()));
+            return player;
+        } catch (Exception exception) {
+            System.err.println("Gagal load audio " + audioPath + ": " + exception.getMessage());
+            return null;
+        }
+    }
+
+    private void playFromStart(MediaPlayer player) {
+        if (player == null) {
+            return;
+        }
+        try {
+            player.seek(Duration.ZERO);
+            player.play();
+        } catch (Exception exception) {
+            System.err.println("Gagal play audio: " + exception.getMessage());
+        }
+    }
+
+    private void fadePlayerVolume(MediaPlayer player, double targetVolume, double seconds, boolean defaultPlayer) {
+        if (player == null) {
+            return;
+        }
+        Timeline oldTimeline = defaultPlayer ? defaultAudioFadeTimeline : effectAudioFadeTimeline;
+        if (oldTimeline != null) {
+            oldTimeline.stop();
+        }
+        Timeline timeline = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(player.volumeProperty(), player.getVolume())),
+                new KeyFrame(Duration.seconds(seconds), new KeyValue(player.volumeProperty(), targetVolume))
+        );
+        timeline.play();
+        if (defaultPlayer) {
+            defaultAudioFadeTimeline = timeline;
+        } else {
+            effectAudioFadeTimeline = timeline;
+        }
+    }
+
+    private void stopEffectGameAudio(boolean dispose) {
+        if (effectAudioFadeTimeline != null) {
+            effectAudioFadeTimeline.stop();
+            effectAudioFadeTimeline = null;
+        }
+        if (effectGameAudioPlayer == null) {
+            return;
+        }
+        try {
+            effectGameAudioPlayer.stop();
+        } catch (Exception exception) {
+            System.err.println("Gagal stop effect audio: " + exception.getMessage());
+        }
+        if (dispose) {
+            disposeMediaPlayer(effectGameAudioPlayer);
+            effectGameAudioPlayer = null;
+        }
+    }
+
+    private void stopGameplayAudio() {
+        gameplayAudioRequested = false;
+        if (defaultAudioFadeTimeline != null) {
+            defaultAudioFadeTimeline.stop();
+            defaultAudioFadeTimeline = null;
+        }
+        stopEffectGameAudio(true);
+        disposeMediaPlayer(defaultGameAudioPlayer);
+        defaultGameAudioPlayer = null;
+    }
+
+    private void disposeMediaPlayer(MediaPlayer player) {
+        if (player == null) {
+            return;
+        }
+        try {
+            player.stop();
+            player.dispose();
+        } catch (Exception exception) {
+            System.err.println("Gagal dispose media player: " + exception.getMessage());
+        }
     }
 
     private StackPane createStartButton() {
@@ -295,6 +594,8 @@ private Path resolveResource(String relativePath) {
     }
 
     private void showMenu(Stage stage) {
+        stopGameplayAudio();
+        startMenuAudio();
         StackPane root = new StackPane();
 
         ImageView background = createImageView(MENU_BACKGROUND_PATH);
@@ -424,6 +725,7 @@ private Path resolveResource(String relativePath) {
             option.setScaleY(1.0);
         });
         option.setOnMousePressed(event -> {
+            playMenuClickSound();
             option.setScaleX(0.98);
             option.setScaleY(0.98);
         });
@@ -703,6 +1005,7 @@ private Image createFallbackImage() {
         Scene scene = new Scene(root, 1280, 720);
         stage.setScene(scene);
         stage.setFullScreen(true);
+        startGameplayDefaultAudio();
         scene.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 showMenu(stage);
@@ -797,6 +1100,7 @@ private Image createFallbackImage() {
             targetMarker.setVisible(false);
             applyKickForce(root, ball, state);
             if (state.shotSpeed < MIN_BALL_SPEED + 20) {
+                playRoundResultAudio(ROUND_RESULT_MISS);
                 damagePlayer(
                         ball,
                         state,
@@ -1029,6 +1333,7 @@ private Image createFallbackImage() {
         Scene scene = new Scene(root, 1280, 720);
         stage.setScene(scene);
         stage.setFullScreen(true);
+        startGameplayDefaultAudio();
         scene.setCursor(Cursor.DEFAULT);
 
         MultiplayerState state = new MultiplayerState();
@@ -1372,6 +1677,7 @@ private Image createFallbackImage() {
         Scene scene = new Scene(root, 1280, 720);
         stage.setScene(scene);
         stage.setFullScreen(true);
+        startGameplayDefaultAudio();
         ball.setCursor(Cursor.DEFAULT);
         setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
 
@@ -1563,6 +1869,7 @@ private Image createFallbackImage() {
             targetMarker.setVisible(false);
             applyKickForce(root, ball, state);
             if (state.shotSpeed < MIN_BALL_SPEED + 20) {
+                playRoundResultAudio(ROUND_RESULT_MISS);
                 registerTournamentShot(false, ball, keeper, state, resultOverlay, resultBox, resultTitle, resultDetail, primaryButton, background, bracketOverlay, startMatchButton, bracketLabels, refreshUi, resetRound);
                 return;
             }
@@ -2863,6 +3170,7 @@ private Image createFallbackImage() {
     }
 
     private void queueRoundResolutionAfterKeeperAnimation(EndlessState state, int roundResult) {
+        playRoundResultAudio(roundResult);
         state.ballMoving = false;
         state.dragging = false;
         state.pendingRoundResult = roundResult;
