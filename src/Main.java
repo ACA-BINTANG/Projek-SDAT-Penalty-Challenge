@@ -641,44 +641,307 @@ private Path resolveResource(String relativePath) {
 
     private void showTutorialMode(Stage stage) {
         StackPane root = new StackPane();
+        Pane playLayer = new Pane();
+        playLayer.setPickOnBounds(true);
 
-        ImageView background = createImageView(MENU_BACKGROUND_PATH);
+        ImageView background = createImageView(GOAL_BACKGROUND_PATH);
         background.setPreserveRatio(false);
         background.fitWidthProperty().bind(root.widthProperty());
         background.fitHeightProperty().bind(root.heightProperty());
 
-        Rectangle overlay = new Rectangle();
-        overlay.widthProperty().bind(root.widthProperty());
-        overlay.heightProperty().bind(root.heightProperty());
-        overlay.setFill(Color.rgb(0, 0, 0, 0.58));
+        ImageView keeper = createImageView(KEEPER_IMAGE_PATH);
+        keeper.setFitWidth(KEEPER_SIZE);
+        keeper.setFitHeight(KEEPER_SIZE);
+        keeper.setPreserveRatio(true);
+        KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
+        keeperAnimator.showIdle();
 
-        VBox panel = new VBox(14);
-        panel.setAlignment(Pos.CENTER);
-        panel.setPadding(new Insets(28));
-        panel.setMaxWidth(760);
-        panel.setBackground(new Background(new BackgroundFill(Color.rgb(8, 18, 60, 0.88), new CornerRadii(18), Insets.EMPTY)));
+        ImageView ball = createImageView(BALL_IMAGE_PATH);
+        ball.setFitWidth(BALL_SIZE);
+        ball.setFitHeight(BALL_SIZE);
+        ball.setPreserveRatio(true);
+        ball.setCursor(Cursor.HAND);
 
-        Text title = new Text("TUTORIAL");
-        title.setFill(Color.WHITE);
-        title.setFont(loadFont(MENU_FONT_PATH, 42, Font.font("Arial", FontWeight.EXTRA_BOLD, 42)));
+        Line pullLine = new Line();
+        pullLine.setStroke(Color.rgb(255, 255, 255, 0.75));
+        pullLine.setStrokeWidth(4);
+        pullLine.setVisible(false);
 
-        Text info = new Text("Tarik bola untuk memilih arah tendangan.\nDi multiplayer, penendang memilih arah bola lebih dulu.\nSetelah itu keeper memilih arah tangkapan.\nJika dua pemain sudah memilih arah, eksekusi berjalan otomatis.\nESC = kembali ke menu.");
-        info.setFill(Color.WHITE);
-        info.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
-        info.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        Circle targetMarker = new Circle(8);
+        targetMarker.setFill(Color.rgb(255, 235, 95, 0.82));
+        targetMarker.setStroke(Color.WHITE);
+        targetMarker.setStrokeWidth(2);
+        targetMarker.setMouseTransparent(true);
+        targetMarker.setVisible(false);
 
-        panel.getChildren().addAll(title, info);
-        root.getChildren().addAll(background, overlay, panel);
+        Rectangle keeperBoxOverlay = new Rectangle();
+        keeperBoxOverlay.setFill(Color.rgb(0, 255, 80, 0.18));
+        keeperBoxOverlay.setStroke(Color.rgb(0, 255, 80, 0.82));
+        keeperBoxOverlay.setStrokeWidth(3);
+        keeperBoxOverlay.setMouseTransparent(true);
+        keeperBoxOverlay.setVisible(SHOW_DEBUG_BOXES);
+
+        Text titleText = new Text("TUTORIAL");
+        titleText.setFill(Color.WHITE);
+        titleText.setFont(loadFont(MENU_FONT_PATH, 30, Font.font("Arial", FontWeight.EXTRA_BOLD, 30)));
+        titleText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - titleText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                titleText.layoutBoundsProperty()
+        ));
+        titleText.setLayoutY(52);
+
+        Text hintText = new Text("LANGKAH 1: Klik dan tahan bola.");
+        hintText.setFill(Color.rgb(255, 255, 255, 0.92));
+        hintText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
+        hintText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> (root.getWidth() - hintText.getLayoutBounds().getWidth()) / 2,
+                root.widthProperty(),
+                hintText.layoutBoundsProperty()
+        ));
+        hintText.setLayoutY(88);
+
+        Text shortcutText = new Text("PRESS ESC TO EXIT");
+        shortcutText.setFill(Color.rgb(255, 255, 255, 0.84));
+        shortcutText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
+        shortcutText.layoutXProperty().bind(Bindings.createDoubleBinding(
+                () -> root.getWidth() - shortcutText.getLayoutBounds().getWidth() - 32,
+                root.widthProperty(),
+                shortcutText.layoutBoundsProperty()
+        ));
+        shortcutText.setLayoutY(40);
+
+        Text goalText = createGoalText(root);
+
+        Rectangle tutorialCompleteOverlay = new Rectangle();
+        tutorialCompleteOverlay.widthProperty().bind(root.widthProperty());
+        tutorialCompleteOverlay.heightProperty().bind(root.heightProperty());
+        tutorialCompleteOverlay.setFill(Color.rgb(0, 0, 0, 0.68));
+        tutorialCompleteOverlay.setVisible(false);
+
+        Text tutorialCompleteTitle = new Text("SELAMAT!");
+        tutorialCompleteTitle.setFill(Color.WHITE);
+        tutorialCompleteTitle.setFont(loadFont(MENU_FONT_PATH, 38, Font.font("Arial", FontWeight.EXTRA_BOLD, 38)));
+
+        Text tutorialCompleteMessage = new Text("Anda telah menyelesaikan tutorial.");
+        tutorialCompleteMessage.setFill(Color.rgb(255, 255, 255, 0.92));
+        tutorialCompleteMessage.setFont(loadFont(MENU_FONT_PATH, 21, Font.font("Arial", FontWeight.BOLD, 21)));
+
+        Button tutorialNextButton = new Button("SELANJUTNYA");
+        tutorialNextButton.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.EXTRA_BOLD, 18)));
+        tutorialNextButton.setCursor(Cursor.HAND);
+        tutorialNextButton.setStyle(
+                "-fx-background-color: #f3c742;"
+                        + "-fx-text-fill: #111111;"
+                        + "-fx-background-radius: 8;"
+                        + "-fx-padding: 12 28 12 28;"
+        );
+        tutorialNextButton.setOnAction(event -> showMenu(stage));
+
+        VBox tutorialCompleteBox = new VBox(18, tutorialCompleteTitle, tutorialCompleteMessage, tutorialNextButton);
+        tutorialCompleteBox.setAlignment(Pos.CENTER);
+        tutorialCompleteBox.setPadding(new Insets(30, 42, 30, 42));
+        tutorialCompleteBox.setBackground(new Background(new BackgroundFill(
+                Color.rgb(0, 0, 0, 0.84),
+                new CornerRadii(12),
+                Insets.EMPTY
+        )));
+        tutorialCompleteBox.setMaxWidth(620);
+        tutorialCompleteBox.setVisible(false);
+
+        StackPane.setAlignment(tutorialCompleteBox, Pos.CENTER);
+
+        playLayer.getChildren().addAll(
+                keeperBoxOverlay,
+                pullLine,
+                targetMarker,
+                keeper,
+                ball,
+                goalText,
+                titleText,
+                hintText,
+                shortcutText
+        );
+        root.getChildren().addAll(background, playLayer, tutorialCompleteOverlay, tutorialCompleteBox);
 
         Scene scene = new Scene(root, 1280, 720);
+        stage.setScene(scene);
+        stage.setFullScreen(true);
+        startGameplayDefaultAudio();
+        scene.setCursor(Cursor.DEFAULT);
+
+        TutorialState state = new TutorialState();
+        Runnable resetRound = () -> {
+            resetEndlessRound(
+                    root,
+                    ball,
+                    keeper,
+                    pullLine,
+                    targetMarker,
+                    state,
+                    keeperAnimator
+            );
+
+            if (state.phase == TutorialPhase.KEEPER_AIM) {
+                prepareTutorialAutoShot(root, ball, targetMarker, state);
+                ball.setCursor(Cursor.DEFAULT);
+            } else if (state.phase == TutorialPhase.KICKER) {
+                ball.setCursor(Cursor.HAND);
+            }
+        };
+
+        Runnable showTutorialCompletePopup = () -> {
+            state.tutorialComplete = true;
+            state.gameOver = true;
+            state.phase = TutorialPhase.COMPLETE;
+            state.ballMoving = false;
+            state.dragging = false;
+            ball.setCursor(Cursor.DEFAULT);
+            titleText.setText("TUTORIAL SELESAI");
+            hintText.setText("Latihan penendang dan keeper sudah selesai.");
+            tutorialCompleteOverlay.setVisible(true);
+            tutorialCompleteBox.setVisible(true);
+            Platform.runLater(tutorialNextButton::requestFocus);
+        };
+
         scene.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 showMenu(stage);
             }
         });
-        stage.setScene(scene);
-        stage.setFullScreen(true);
-        scene.setCursor(Cursor.DEFAULT);
+
+        root.widthProperty().addListener((observable, oldValue, newValue) -> {
+            if (!state.tutorialComplete && !state.ballMoving && !state.roundResolving) {
+                resetRound.run();
+            }
+        });
+        root.heightProperty().addListener((observable, oldValue, newValue) -> {
+            if (!state.tutorialComplete && !state.ballMoving && !state.roundResolving) {
+                resetRound.run();
+            }
+        });
+        Platform.runLater(resetRound);
+
+        ball.setOnMousePressed(event -> {
+            if (state.tutorialComplete || state.phase != TutorialPhase.KICKER || state.ballMoving || state.roundResolving) {
+                return;
+            }
+
+            state.dragging = true;
+            state.anchorX = getCenterX(ball);
+            state.anchorY = getCenterY(ball);
+            pullLine.setStartX(state.anchorX);
+            pullLine.setStartY(state.anchorY);
+            pullLine.setEndX(state.anchorX);
+            pullLine.setEndY(state.anchorY);
+            pullLine.setVisible(true);
+            targetMarker.setVisible(false);
+            hintText.setText("LANGKAH 2: Tarik bola untuk menentukan arah tendangan.");
+        });
+
+        ball.setOnMouseDragged(event -> {
+            if (state.tutorialComplete || state.phase != TutorialPhase.KICKER || !state.dragging || state.ballMoving || state.roundResolving) {
+                return;
+            }
+
+            double mouseX = event.getSceneX();
+            double mouseY = event.getSceneY();
+            double dx = mouseX - state.anchorX;
+            double dy = mouseY - state.anchorY;
+            double distance = Math.hypot(dx, dy);
+            if (distance > MAX_PULL_DISTANCE) {
+                dx = dx / distance * MAX_PULL_DISTANCE;
+                dy = dy / distance * MAX_PULL_DISTANCE;
+            }
+
+            setCenter(ball, state.anchorX + dx, state.anchorY + dy);
+            pullLine.setEndX(getCenterX(ball));
+            pullLine.setEndY(getCenterY(ball));
+            updateTargetMarker(root, ball, targetMarker, state);
+
+            if (distance > MAX_PULL_DISTANCE * 0.28) {
+                hintText.setText("LANGKAH 3: Lepaskan mouse untuk menendang bola.");
+            }
+        });
+
+        ball.setOnMouseReleased(event -> {
+            if (state.tutorialComplete || state.phase != TutorialPhase.KICKER || !state.dragging || state.ballMoving || state.roundResolving) {
+                return;
+            }
+
+            state.dragging = false;
+            pullLine.setVisible(false);
+            targetMarker.setVisible(false);
+            applyKickForce(root, ball, state);
+
+            if (state.shotSpeed < MIN_BALL_SPEED + 20) {
+                setCenter(ball, state.anchorX, state.anchorY);
+                hintText.setText("Tarikan terlalu lemah. Klik bola lalu tarik lebih jauh.");
+                return;
+            }
+
+            hintText.setText("LANGKAH 4: Perhatikan tendanganmu dan coba cetak GOAL!");
+            chooseKeeperTarget(root, state);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch, state.keeperVerticalJump);
+            state.ballMoving = true;
+            startKeeperJumpMovement(root, keeper, state, KEEPER_MOVE_SPEED);
+        });
+
+        playLayer.setOnMouseClicked(event -> {
+            if (state.tutorialComplete
+                    || state.phase != TutorialPhase.KEEPER_AIM
+                    || state.ballMoving
+                    || state.roundResolving) {
+                return;
+            }
+
+            double selectedX = event.getX();
+            double selectedY = event.getY();
+            if (!isPointInsidePointBox(root, selectedX, selectedY)) {
+                hintText.setText("LANGKAH 6: Klik lingkaran kuning di area gawang untuk mengarahkan keeper.");
+                return;
+            }
+
+            prepareTutorialKeeperTarget(root, state, selectedX, selectedY);
+            targetMarker.setVisible(false);
+            keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch, state.keeperVerticalJump);
+            state.phase = TutorialPhase.KEEPER_EXECUTING;
+            state.ballMoving = true;
+            startKeeperJumpMovement(root, keeper, state, KEEPER_MOVE_SPEED);
+            hintText.setText("LANGKAH 7: Keeper bergerak. Coba tahan tendangan lawan!");
+            event.consume();
+        });
+
+        AnimationTimer gameLoop = new AnimationTimer() {
+            private long lastFrameTime = 0;
+
+            @Override
+            public void handle(long now) {
+                if (lastFrameTime == 0) {
+                    lastFrameTime = now;
+                    return;
+                }
+
+                double deltaSeconds = (now - lastFrameTime) / 1_000_000_000.0;
+                lastFrameTime = now;
+                updateTutorial(
+                        root,
+                        ball,
+                        keeper,
+                        keeperAnimator,
+                        keeperBoxOverlay,
+                        goalText,
+                        titleText,
+                        hintText,
+                        shortcutText,
+                        state,
+                        resetRound,
+                        showTutorialCompletePopup,
+                        deltaSeconds
+                );
+            }
+        };
+        gameLoop.start();
     }
 
     private StackPane createMenuOption(String modeName) {
@@ -3082,6 +3345,238 @@ private Image createFallbackImage() {
         }
     }
 
+    private void prepareTutorialAutoShot(
+            StackPane root,
+            ImageView ball,
+            Circle targetMarker,
+            TutorialState state
+    ) {
+        double goalWidth = root.getWidth() * (GOAL_RIGHT_RATIO - GOAL_LEFT_RATIO);
+        double goalHeight = root.getHeight() * (GOAL_BOTTOM_RATIO - GOAL_TOP_RATIO);
+        double safeMarginX = Math.max(48, goalWidth * 0.16);
+        double safeMarginY = Math.max(34, goalHeight * 0.18);
+
+        double minX = root.getWidth() * GOAL_LEFT_RATIO + safeMarginX;
+        double maxX = root.getWidth() * GOAL_RIGHT_RATIO - safeMarginX;
+        double minY = root.getHeight() * GOAL_TOP_RATIO + safeMarginY;
+        double maxY = root.getHeight() * GOAL_BOTTOM_RATIO - safeMarginY;
+
+        state.targetX = randomBetween(minX, maxX);
+        state.targetY = randomBetween(minY, maxY);
+        state.shotSpeed = Math.max(MIN_BALL_SPEED + 160, 650);
+        state.velocityX = 0;
+        state.velocityY = 0;
+
+        targetMarker.setCenterX(state.targetX);
+        targetMarker.setCenterY(state.targetY);
+        targetMarker.setVisible(true);
+        targetMarker.setOpacity(1);
+        setCenter(ball, state.anchorX, state.anchorY);
+    }
+
+    private void prepareTutorialKeeperTarget(
+            StackPane root,
+            TutorialState state,
+            double selectedX,
+            double selectedY
+    ) {
+        double centerX = root.getWidth() * 0.5;
+        double centerY = root.getHeight() * KEEPER_START_CENTER_Y_RATIO;
+        double sideThreshold = Math.max(42, root.getWidth() * KEEPER_DIVE_TRIGGER_RATIO);
+
+        int direction;
+        if (selectedX > centerX + sideThreshold) {
+            direction = 1;
+        } else if (selectedX < centerX - sideThreshold) {
+            direction = -1;
+        } else {
+            direction = 0;
+        }
+
+        boolean upperCenterSelection = direction == 0 && selectedY < centerY - root.getHeight() * 0.045;
+        state.keeperDiveDirection = direction;
+        state.keeperVerticalJump = upperCenterSelection;
+
+        double minCenterX = getKeeperMovementMinX(root);
+        double maxCenterX = getKeeperMovementMaxX(root);
+        double minCenterY = getKeeperMovementMinY(root);
+        double maxCenterY = getKeeperMovementMaxY(root);
+
+        if (direction == 0) {
+            state.keeperTargetX = centerX;
+            state.keeperTargetY = clamp(
+                    selectedY - getKeeperSensorOffsetY(0),
+                    minCenterY,
+                    maxCenterY
+            );
+        } else {
+            state.keeperTargetX = clamp(
+                    selectedX - getKeeperSensorOffsetX(direction),
+                    minCenterX,
+                    maxCenterX
+            );
+            state.keeperTargetY = clamp(
+                    selectedY - getKeeperSensorOffsetY(direction),
+                    minCenterY,
+                    maxCenterY
+            );
+        }
+
+        state.keeperJumping = upperCenterSelection
+                || Math.hypot(state.keeperTargetX - centerX, state.keeperTargetY - centerY) > 18;
+        if (state.keeperJumping) {
+            configureKeeperJumpMotion(root, state, centerX, centerY);
+        }
+
+        boolean shotInsideGoal = isPointInsidePointBox(root, state.targetX, state.targetY);
+        int logicalFrame = state.keeperDiveDirection == 0
+                ? (state.keeperVerticalJump ? 4 : 1)
+                : 4;
+        state.keeperWillCatch = shotInsideGoal && isPointInsideKeeperSensorBoxAt(
+                state.keeperTargetX,
+                state.keeperTargetY,
+                state.keeperDiveDirection,
+                logicalFrame,
+                state.targetX,
+                state.targetY
+        );
+    }
+
+    private void updateTutorial(
+            StackPane root,
+            ImageView ball,
+            ImageView keeper,
+            KeeperAnimator keeperAnimator,
+            Rectangle keeperBoxOverlay,
+            Text goalText,
+            Text titleText,
+            Text hintText,
+            Text shortcutText,
+            TutorialState state,
+            Runnable resetRound,
+            Runnable showTutorialCompletePopup,
+            double deltaSeconds
+    ) {
+        updateGoalText(goalText, state, deltaSeconds);
+        if (state.tutorialComplete) {
+            return;
+        }
+
+        if (state.roundResolving) {
+            state.roundResolveTimer -= deltaSeconds;
+            if (state.roundResolveTimer <= 0) {
+                int result = state.roundResult;
+                state.roundResolving = false;
+                state.awaitingKeeperAnimationFinish = false;
+                state.pendingRoundResult = ROUND_RESULT_NONE;
+                state.roundResult = ROUND_RESULT_NONE;
+                state.roundResolveTimer = 0;
+
+                if (state.phase == TutorialPhase.KICKER) {
+                    if (result == ROUND_RESULT_GOAL) {
+                        state.phase = TutorialPhase.KEEPER_AIM;
+                        titleText.setText("TUTORIAL - KEEPER");
+                        shortcutText.setText("PRESS ESC TO EXIT");
+                        resetRound.run();
+                        hintText.setText("BAGUS! Sekarang kamu menjadi KEEPER untuk persiapan COOP. Klik lingkaran kuning di gawang.");
+                    } else {
+                        resetRound.run();
+                        hintText.setText("BELUM GOL. LANGKAH 1: Klik dan tahan bola untuk mencoba lagi.");
+                    }
+                } else if (state.phase == TutorialPhase.KEEPER_EXECUTING) {
+                    if (result == ROUND_RESULT_SAVED) {
+                        showTutorialCompletePopup.run();
+                    } else {
+                        state.phase = TutorialPhase.KEEPER_AIM;
+                        resetRound.run();
+                        hintText.setText("BELUM BERHASIL MENAHAN BOLA. Klik lingkaran kuning dan coba menjadi keeper lagi.");
+                    }
+                }
+            }
+            return;
+        }
+
+        double motionDeltaSeconds = consumeRetroMotionDelta(state, deltaSeconds);
+        if (motionDeltaSeconds > 0) {
+            keeperAnimator.update(motionDeltaSeconds);
+            updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+
+            if (keeperAnimator.consumeDiveFallEvent()) {
+                if (state.keeperDiveDirection != 0 || state.keeperVerticalJump) {
+                    startKeeperDiveFall(root, keeper, state);
+                }
+            }
+
+            if (keeperAnimator.consumeCatchBallHideEvent()) {
+                ball.setVisible(false);
+                state.ballMoving = false;
+                queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_SAVED);
+            }
+
+            if (state.keeperFallingAfterCatch) {
+                updateKeeperDiveFall(keeper, state, motionDeltaSeconds);
+                updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+            }
+
+            if (state.keeperMoving) {
+                updateKeeperJumpMovement(root, keeper, state, motionDeltaSeconds);
+                updateKeeperSensorOverlay(keeperBoxOverlay, keeper, keeperAnimator, state);
+            }
+        }
+
+        if (state.awaitingKeeperAnimationFinish) {
+            if (keeperAnimator.isSequenceFinished() && !state.keeperFallingAfterCatch) {
+                beginRoundResolution(state, state.pendingRoundResult);
+            }
+            return;
+        }
+
+        if (!state.ballMoving || motionDeltaSeconds <= 0) {
+            return;
+        }
+
+        double ballCenterX = getCenterX(ball);
+        double ballCenterY = getCenterY(ball);
+        double distanceToTarget = Math.hypot(state.targetX - ballCenterX, state.targetY - ballCenterY);
+        double step = state.shotSpeed * motionDeltaSeconds;
+        boolean reachedTarget = distanceToTarget <= step;
+
+        if (reachedTarget) {
+            setCenterForMotion(ball, state.targetX, state.targetY);
+        } else {
+            setCenterForMotion(
+                    ball,
+                    ballCenterX + (state.targetX - ballCenterX) / distanceToTarget * step,
+                    ballCenterY + (state.targetY - ballCenterY) / distanceToTarget * step
+            );
+        }
+
+        updateBallRetroRotation(ball, state, motionDeltaSeconds);
+        updateBallPerspectiveScale(ball, state);
+
+        double width = root.getWidth();
+        double height = root.getHeight();
+        boolean outsideScreen = getCenterX(ball) < -80
+                || getCenterX(ball) > width + 80
+                || getCenterY(ball) < -80
+                || getCenterY(ball) > height + 80;
+
+        if (reachedTarget && isShotSavedByKeeper(keeper, keeperAnimator, state)) {
+            state.ballMoving = false;
+            return;
+        }
+
+        if (reachedTarget && isBallInsidePointBox(root, ball)) {
+            triggerGoalText(goalText, state);
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
+            return;
+        }
+
+        if (outsideScreen || reachedTarget) {
+            queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_MISS);
+        }
+    }
+
     private void startKeeperDiveFall(StackPane root, ImageView keeper, EndlessState state) {
         // Setelah keeper meloncat, keeper turun lagi ke tanah pada alur yang membulat,
         // bukan berhenti lalu geser balik ke posisi awal.
@@ -4227,12 +4722,24 @@ private Image createFallbackImage() {
     }
 
 
+    private enum TutorialPhase {
+        KICKER,
+        KEEPER_AIM,
+        KEEPER_EXECUTING,
+        COMPLETE
+    }
+
     private enum MultiplayerPhase {
         KICKER_AIM,
         KEEPER_AIM,
         EXECUTING,
         ROUND_DELAY,
         GAME_OVER
+    }
+
+    private static class TutorialState extends EndlessState {
+        boolean tutorialComplete;
+        TutorialPhase phase = TutorialPhase.KICKER;
     }
 
     private static class MultiplayerState extends EndlessState {
