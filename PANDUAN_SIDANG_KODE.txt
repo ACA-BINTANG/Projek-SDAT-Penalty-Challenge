@@ -1,0 +1,50 @@
+PANDUAN MENJELASKAN KODE SAAT SIDANG
+====================================
+
+A. MAIN.JAVA
+------------
+Kode paling utama hanya:
+
+public class Main extends GameEngine {
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+
+Penjelasan:
+- Main adalah titik awal program.
+- extends GameEngine berarti Main mendapatkan fitur aplikasi dan engine permainan.
+- launch(args) menjalankan JavaFX.
+
+B. GAMEAPP.JAVA
+---------------
+Fokus penjelasan pada 4 fungsi:
+1. start(Stage stage) = membuka aplikasi dan intro.
+2. showMenu(Stage stage) = menampilkan menu utama.
+3. createMenuOption(...) = membuat pilihan menu.
+4. showXxxMode(Stage stage) = membuka class mode yang dipilih.
+
+C. GAMEENGINE.JAVA
+------------------
+Tidak perlu menjelaskan setiap baris. Jelaskan berdasarkan kelompok fungsi:
+1. Input tendangan -> calculateShot() dan applyKickForce().
+2. Update bola -> updateEndless(), updateMultiplayer(), updateTournament(), updateTutorial().
+3. Keeper -> KeeperAnimator dan fungsi sensor keeper.
+4. Hasil tendangan -> GOAL, SAVE, atau MISS.
+5. Reset ronde -> resetEndlessRound().
+6. Scoreboard -> loadEndlessScoreboardEntries() dan saveTopScore().
+
+D. FILE MODE
+-------------
+Setiap file mode menggunakan pola yang sama:
+1. Membuat komponen tampilan.
+2. Membuat object State untuk menyimpan kondisi game.
+3. Membuat fungsi reset ronde.
+4. Memasang event mouse dan keyboard.
+5. Menjalankan AnimationTimer sebagai game loop.
+
+E. KALIMAT AMAN SAAT DITANYA KENAPA DIMODULARISASI
+---------------------------------------------------
+"Supaya setiap fitur punya tanggung jawab yang jelas. Jika ada bug di Tournament, saya cukup
+membuka TournamentMode.java tanpa mengganggu Co-op atau Endless. Fungsi yang sama seperti
+gerakan bola dan keeper disimpan satu kali di GameEngine agar tidak terjadi duplikasi kode."
