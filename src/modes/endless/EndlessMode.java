@@ -9,6 +9,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -58,12 +59,17 @@ public class EndlessMode extends GameEngine {
         keeper.setPreserveRatio(true);
         KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
         keeperAnimator.showIdle();
+        // Jangan tampilkan actor sebelum ukuran layar final tersedia.
+        // Ini mencegah keeper berkedip dari koordinat default (0,0) ke tengah.
+        keeper.setVisible(false);
 
         ImageView ball = createImageView(BALL_IMAGE_PATH);
         ball.setFitWidth(BALL_SIZE);
         ball.setFitHeight(BALL_SIZE);
         ball.setPreserveRatio(true);
         ball.setCursor(Cursor.HAND);
+        // Bola juga disembunyikan sampai posisi awal sudah dihitung dari ukuran layar aktual.
+        ball.setVisible(false);
 
         Line pullLine = new Line();
         pullLine.setStroke(Color.rgb(255, 255, 255, 0.75));
@@ -107,7 +113,7 @@ public class EndlessMode extends GameEngine {
         ));
         scoreText.setLayoutY(58);
 
-        Text livesText = new Text("DARAH: " + MAX_PLAYER_LIVES);
+        Text livesText = new Text("LIVES: " + MAX_PLAYER_LIVES);
         livesText.setFill(Color.WHITE);
         livesText.setFont(loadFont(MENU_FONT_PATH, 24, Font.font("Arial", FontWeight.BOLD, 24)));
         livesText.setLayoutX(32);
@@ -129,21 +135,17 @@ public class EndlessMode extends GameEngine {
             livesIndicatorBox.getChildren().add(indicator);
         }
 
-        Text hintText = new Text("Tarik bola, lalu lepas");
+        Text hintText = new Text("Drag the ball, then release");
         hintText.setFill(Color.rgb(255, 255, 255, 0.82));
         hintText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
         hintText.setLayoutX(32);
         hintText.setLayoutY(82);
 
-        Text shortcutText = new Text("ESC = MENU");
-        shortcutText.setFill(Color.rgb(255, 255, 255, 0.9));
-        shortcutText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
-        shortcutText.layoutXProperty().bind(Bindings.createDoubleBinding(
-                () -> root.getWidth() - shortcutText.getLayoutBounds().getWidth() - 32,
-                root.widthProperty(),
-                shortcutText.layoutBoundsProperty()
-        ));
-        shortcutText.setLayoutY(34);
+        hintText.setVisible(false);
+
+        Button menuButton = createGameplayMenuButton(stage);
+        StackPane.setAlignment(menuButton, Pos.TOP_RIGHT);
+        StackPane.setMargin(menuButton, new Insets(18, 28, 0, 0));
 
         Button scoreboardButton = new Button("SCOREBOARD");
         scoreboardButton.setFont(loadFont(MENU_FONT_PATH, 14, Font.font("Arial", FontWeight.BOLD, 14)));
@@ -161,28 +163,61 @@ public class EndlessMode extends GameEngine {
                 root.widthProperty(),
                 scoreboardButton.boundsInLocalProperty()
         ));
-        scoreboardButton.setLayoutY(52);
+        scoreboardButton.setLayoutY(66);
 
         Text scoreboardTitle = new Text("ENDLESS SCOREBOARD");
         scoreboardTitle.setFill(Color.rgb(255, 235, 120));
-        scoreboardTitle.setFont(loadFont(MENU_FONT_PATH, 28, Font.font("Arial", FontWeight.BOLD, 28)));
+        scoreboardTitle.setFont(loadFont(MENU_FONT_PATH, 28, Font.font("Arial", FontWeight.EXTRA_BOLD, 28)));
 
-        Text scoreboardContent = new Text();
-        scoreboardContent.setFill(Color.WHITE);
-        scoreboardContent.setFont(loadFont(MENU_FONT_PATH, 19, Font.font("Monospaced", FontWeight.BOLD, 19)));
+        String scoreboardHeaderStyle =
+                "-fx-background-color: #0b3f8f;" +
+                "-fx-border-color: white;" +
+                "-fx-border-width: 2;" +
+                "-fx-padding: 8 12 8 12;";
+
+        Label rankHeader = new Label("RANK");
+        Label playerHeader = new Label("PLAYER");
+        Label pointsHeader = new Label("POINTS");
+        Label[] scoreboardHeaders = {rankHeader, playerHeader, pointsHeader};
+        for (Label header : scoreboardHeaders) {
+            header.setTextFill(Color.WHITE);
+            header.setFont(loadFont(MENU_FONT_PATH, 14, Font.font("Arial", FontWeight.EXTRA_BOLD, 14)));
+            header.setMinHeight(28);
+        }
+        rankHeader.setPrefWidth(90);
+        rankHeader.setAlignment(Pos.CENTER_LEFT);
+        playerHeader.setPrefWidth(300);
+        playerHeader.setAlignment(Pos.CENTER_LEFT);
+        pointsHeader.setPrefWidth(130);
+        pointsHeader.setAlignment(Pos.CENTER_RIGHT);
+
+        HBox scoreboardHeader = new HBox(rankHeader, playerHeader, pointsHeader);
+        scoreboardHeader.setAlignment(Pos.CENTER_LEFT);
+        scoreboardHeader.setPrefWidth(544);
+        scoreboardHeader.setMaxWidth(544);
+        scoreboardHeader.setStyle(scoreboardHeaderStyle);
+
+        VBox scoreboardRows = new VBox(5);
+        scoreboardRows.setAlignment(Pos.TOP_CENTER);
+        scoreboardRows.setMinHeight(340);
+        scoreboardRows.setPrefHeight(340);
+        scoreboardRows.setPrefWidth(544);
+        scoreboardRows.setMaxWidth(544);
 
         Button previousScorePageButton = new Button("< PREV");
         Button nextScorePageButton = new Button("NEXT >");
         Text scoreboardPageText = new Text();
         scoreboardPageText.setFill(Color.rgb(255, 235, 120));
-        scoreboardPageText.setFont(loadFont(MENU_FONT_PATH, 14, Font.font("Arial", FontWeight.BOLD, 14)));
+        scoreboardPageText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.EXTRA_BOLD, 16)));
 
         String scoreboardPageButtonStyle =
-                "-fx-background-color: #111111;" +
+                "-fx-background-color: #0b63ce;" +
                 "-fx-text-fill: white;" +
                 "-fx-border-color: white;" +
                 "-fx-border-width: 2;" +
-                "-fx-padding: 6 12 6 12;";
+                "-fx-background-radius: 4;" +
+                "-fx-border-radius: 4;" +
+                "-fx-padding: 7 14 7 14;";
         previousScorePageButton.setStyle(scoreboardPageButtonStyle);
         nextScorePageButton.setStyle(scoreboardPageButtonStyle);
         previousScorePageButton.setCursor(Cursor.HAND);
@@ -192,11 +227,29 @@ public class EndlessMode extends GameEngine {
         previousScorePageButton.setFont(loadFont(MENU_FONT_PATH, 13, Font.font("Arial", FontWeight.BOLD, 13)));
         nextScorePageButton.setFont(loadFont(MENU_FONT_PATH, 13, Font.font("Arial", FontWeight.BOLD, 13)));
 
-        HBox scoreboardPagination = new HBox(14, previousScorePageButton, scoreboardPageText, nextScorePageButton);
+        StackPane previousButtonSlot = new StackPane(previousScorePageButton);
+        previousButtonSlot.setPrefWidth(125);
+        previousButtonSlot.setMinWidth(125);
+        previousButtonSlot.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane pageNumberSlot = new StackPane(scoreboardPageText);
+        pageNumberSlot.setPrefWidth(100);
+        pageNumberSlot.setMinWidth(100);
+        pageNumberSlot.setAlignment(Pos.CENTER);
+
+        StackPane nextButtonSlot = new StackPane(nextScorePageButton);
+        nextButtonSlot.setPrefWidth(125);
+        nextButtonSlot.setMinWidth(125);
+        nextButtonSlot.setAlignment(Pos.CENTER_RIGHT);
+
+        HBox scoreboardPagination = new HBox(8, previousButtonSlot, pageNumberSlot, nextButtonSlot);
         scoreboardPagination.setAlignment(Pos.CENTER);
+        scoreboardPagination.setPrefWidth(544);
+        scoreboardPagination.setMaxWidth(544);
 
         final int scoreboardPageSize = 10;
         final int[] scoreboardPage = {0};
+        final String[] highlightedScoreId = {null};
         Runnable refreshScoreboard = () -> {
             List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
             int totalPages = Math.max(1, (entries.size() + scoreboardPageSize - 1) / scoreboardPageSize);
@@ -207,13 +260,81 @@ public class EndlessMode extends GameEngine {
                 scoreboardPage[0] = 0;
             }
 
-            scoreboardContent.setText(formatEndlessScoreboardPage(entries, scoreboardPage[0], scoreboardPageSize));
-            scoreboardPageText.setText(
-                    "HALAMAN " + (scoreboardPage[0] + 1) + " / " + totalPages +
-                    "   •   TOTAL " + entries.size() + " DATA"
-            );
-            previousScorePageButton.setDisable(scoreboardPage[0] <= 0);
-            nextScorePageButton.setDisable(scoreboardPage[0] >= totalPages - 1);
+            scoreboardRows.getChildren().clear();
+            if (entries.isEmpty()) {
+                Label emptyLabel = new Label("NO SCORES SAVED YET");
+                emptyLabel.setTextFill(Color.WHITE);
+                emptyLabel.setFont(loadFont(MENU_FONT_PATH, 17, Font.font("Arial", FontWeight.BOLD, 17)));
+                emptyLabel.setPrefWidth(544);
+                emptyLabel.setPrefHeight(52);
+                emptyLabel.setAlignment(Pos.CENTER);
+                emptyLabel.setStyle(
+                        "-fx-background-color: #101010;" +
+                        "-fx-border-color: white;" +
+                        "-fx-border-width: 0 1 1 1;"
+                );
+                scoreboardRows.getChildren().add(emptyLabel);
+            } else {
+                int startIndex = scoreboardPage[0] * scoreboardPageSize;
+                int endIndex = Math.min(startIndex + scoreboardPageSize, entries.size());
+                for (int i = startIndex; i < endIndex; i++) {
+                    EndlessScoreEntry entry = entries.get(i);
+                    String safeName = entry.playerName.length() > 16
+                            ? entry.playerName.substring(0, 16)
+                            : entry.playerName;
+                    boolean highlighted = highlightedScoreId[0] != null
+                            && highlightedScoreId[0].equals(entry.entryId);
+
+                    Label rankLabel = new Label(String.format("%02d", i + 1));
+                    Label playerLabel = new Label(safeName.toUpperCase());
+                    Label pointsLabel = new Label(String.valueOf(entry.score));
+                    Label[] rowLabels = {rankLabel, playerLabel, pointsLabel};
+                    for (Label label : rowLabels) {
+                        label.setTextFill(highlighted ? Color.BLACK : Color.WHITE);
+                        label.setFont(loadFont(
+                                MENU_FONT_PATH,
+                                16,
+                                Font.font("Arial", highlighted ? FontWeight.EXTRA_BOLD : FontWeight.BOLD, 16)
+                        ));
+                        label.setMinHeight(24);
+                    }
+
+                    rankLabel.setPrefWidth(90);
+                    rankLabel.setAlignment(Pos.CENTER_LEFT);
+                    playerLabel.setPrefWidth(300);
+                    playerLabel.setAlignment(Pos.CENTER_LEFT);
+                    pointsLabel.setPrefWidth(130);
+                    pointsLabel.setAlignment(Pos.CENTER_RIGHT);
+
+                    HBox scoreRow = new HBox(rankLabel, playerLabel, pointsLabel);
+                    scoreRow.setAlignment(Pos.CENTER_LEFT);
+                    scoreRow.setPrefWidth(544);
+                    scoreRow.setMaxWidth(544);
+                    scoreRow.setMinHeight(29);
+                    scoreRow.setStyle(highlighted
+                            ? "-fx-background-color: #ffe128;" +
+                              "-fx-border-color: white;" +
+                              "-fx-border-width: 1;" +
+                              "-fx-padding: 5 12 5 12;"
+                            : "-fx-background-color: #101010;" +
+                              "-fx-border-color: #666666;" +
+                              "-fx-border-width: 0 1 1 1;" +
+                              "-fx-padding: 5 12 5 12;"
+                    );
+                    scoreboardRows.getChildren().add(scoreRow);
+                }
+            }
+
+            // Hanya tampilkan angka halaman, tanpa tulisan PAGE atau TOTAL.
+            scoreboardPageText.setText((scoreboardPage[0] + 1) + " / " + totalPages);
+
+            // Slot tombol tetap memiliki lebar yang sama agar nomor halaman selalu di tengah.
+            boolean hasPreviousPage = scoreboardPage[0] > 0;
+            boolean hasNextPage = scoreboardPage[0] < totalPages - 1;
+            previousScorePageButton.setVisible(hasPreviousPage);
+            previousScorePageButton.setMouseTransparent(!hasPreviousPage);
+            nextScorePageButton.setVisible(hasNextPage);
+            nextScorePageButton.setMouseTransparent(!hasNextPage);
         };
 
         previousScorePageButton.setOnAction(event -> {
@@ -223,23 +344,38 @@ public class EndlessMode extends GameEngine {
             }
         });
         nextScorePageButton.setOnAction(event -> {
-            scoreboardPage[0]++;
-            refreshScoreboard.run();
+            int totalPages = Math.max(1,
+                    (loadEndlessScoreboardEntries().size() + scoreboardPageSize - 1) / scoreboardPageSize);
+            if (scoreboardPage[0] < totalPages - 1) {
+                scoreboardPage[0]++;
+                refreshScoreboard.run();
+            }
         });
 
-        Text scoreboardHint = new Text("10 DATA PER HALAMAN • DIURUTKAN DARI SKOR TERTINGGI");
-        scoreboardHint.setFill(Color.rgb(210, 210, 210));
-        scoreboardHint.setFont(loadFont(MENU_FONT_PATH, 14, Font.font("Arial", FontWeight.BOLD, 14)));
-
-        VBox scoreboardPanel = new VBox(16, scoreboardTitle, scoreboardContent, scoreboardPagination, scoreboardHint);
+        VBox scoreboardPanel = new VBox(12,
+                scoreboardTitle,
+                scoreboardHeader,
+                scoreboardRows,
+                scoreboardPagination
+        );
         scoreboardPanel.setAlignment(Pos.TOP_CENTER);
-        scoreboardPanel.setPadding(new Insets(24, 34, 24, 34));
+        scoreboardPanel.setPadding(new Insets(20, 28, 20, 28));
+        // Panel dibuat hitam pekat, bukan transparan, supaya gawang dan penonton
+        // tidak terlihat menembus area scoreboard.
         scoreboardPanel.setBackground(new Background(new BackgroundFill(
-                Color.rgb(0, 0, 0, 0.92), new CornerRadii(10), Insets.EMPTY
+                Color.BLACK, new CornerRadii(10), Insets.EMPTY
         )));
-        scoreboardPanel.setStyle("-fx-border-color: white; -fx-border-width: 3;");
-        scoreboardPanel.setMaxWidth(560);
-        scoreboardPanel.setMinWidth(480);
+        scoreboardPanel.setStyle(
+                "-fx-background-color: #000000;" +
+                "-fx-border-color: white;" +
+                "-fx-border-width: 3;" +
+                "-fx-border-radius: 10;" +
+                "-fx-background-radius: 10;"
+        );
+        scoreboardPanel.setOpacity(1.0);
+        scoreboardPanel.setPrefWidth(600);
+        scoreboardPanel.setMaxWidth(600);
+        scoreboardPanel.setMinWidth(600);
         scoreboardPanel.setVisible(false);
         scoreboardPanel.layoutXProperty().bind(Bindings.createDoubleBinding(
                 () -> (root.getWidth() - scoreboardPanel.getBoundsInLocal().getWidth()) / 2,
@@ -247,7 +383,7 @@ public class EndlessMode extends GameEngine {
                 scoreboardPanel.boundsInLocalProperty()
         ));
         scoreboardPanel.layoutYProperty().bind(Bindings.createDoubleBinding(
-                () -> Math.max(125, (root.getHeight() - scoreboardPanel.getBoundsInLocal().getHeight()) / 2),
+                () -> Math.max(108, (root.getHeight() - scoreboardPanel.getBoundsInLocal().getHeight()) / 2),
                 root.heightProperty(),
                 scoreboardPanel.boundsInLocalProperty()
         ));
@@ -256,10 +392,19 @@ public class EndlessMode extends GameEngine {
             boolean show = !scoreboardPanel.isVisible();
             if (show) {
                 scoreboardPage[0] = 0;
+                if (highlightedScoreId[0] != null) {
+                    List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
+                    for (int i = 0; i < entries.size(); i++) {
+                        if (highlightedScoreId[0].equals(entries.get(i).entryId)) {
+                            scoreboardPage[0] = i / scoreboardPageSize;
+                            break;
+                        }
+                    }
+                }
                 refreshScoreboard.run();
             }
             scoreboardPanel.setVisible(show);
-            scoreboardButton.setText(show ? "TUTUP SCOREBOARD" : "SCOREBOARD");
+            scoreboardButton.setText(show ? "CLOSE SCOREBOARD" : "SCOREBOARD");
         });
 
         Text goalText = createGoalText(root);
@@ -288,17 +433,17 @@ public class EndlessMode extends GameEngine {
         finalScoreText.setFill(Color.WHITE);
         finalScoreText.setFont(loadFont(MENU_FONT_PATH, 24, Font.font("Arial", FontWeight.BOLD, 24)));
 
-        Text nameLabel = new Text("NAMA PLAYER");
+        Text nameLabel = new Text("PLAYER NAME");
         nameLabel.setFill(Color.WHITE);
         nameLabel.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
 
         TextField nameInput = new TextField();
-        nameInput.setPromptText("Isi nama");
+        nameInput.setPromptText("Enter name");
         nameInput.setMaxWidth(260);
         nameInput.setFont(Font.font("Arial", FontWeight.BOLD, 16));
 
-        Button saveButton = new Button("SIMPAN");
-        Button cancelButton = new Button("BATAL");
+        Button saveButton = new Button("SAVE");
+        Button cancelButton = new Button("CANCEL");
         saveButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         cancelButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         saveButton.setCursor(Cursor.HAND);
@@ -328,7 +473,6 @@ public class EndlessMode extends GameEngine {
                 pointBoxOverlay,
                 keeperBoxOverlay,
                 pullLine,
-                targetMarker,
                 keeper,
                 ball,
                 goalText,
@@ -337,14 +481,13 @@ public class EndlessMode extends GameEngine {
                 livesText,
                 livesIndicatorBox,
                 hintText,
-                shortcutText,
                 scoreboardButton,
                 gameOverOverlay,
                 gameOverText,
                 saveScoreBox,
                 scoreboardPanel
         );
-        root.getChildren().addAll(background, playLayer);
+        root.getChildren().addAll(background, playLayer, menuButton);
 
         Scene scene = new Scene(root, 1280, 720);
         setSceneSmooth(stage, scene, this::startGameplayDefaultAudio);
@@ -360,13 +503,19 @@ public class EndlessMode extends GameEngine {
 
         EndlessState state = new EndlessState();
         state.lives = MAX_PLAYER_LIVES;
-        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state, keeperAnimator);
+        Runnable resetRound = () -> {
+            resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state, keeperAnimator);
+            if (root.getWidth() > 0 && root.getHeight() > 0) {
+                keeper.setVisible(true);
+                ball.setVisible(true);
+            }
+        };
         Runnable restartGame = () -> {
             state.score = 0;
             state.lives = MAX_PLAYER_LIVES;
             state.scoredShotsLearned = 0;
             scoreText.setText("POINT: 0");
-            livesText.setText("DARAH: " + state.lives);
+            livesText.setText("LIVES: " + state.lives);
             updateLifeIndicators(lifeIndicators, state.lives);
             gameOverOverlay.setVisible(false);
             gameOverText.setVisible(false);
@@ -387,15 +536,27 @@ public class EndlessMode extends GameEngine {
         saveButton.setOnAction(event -> {
             String playerName = nameInput.getText().trim();
             if (playerName.isEmpty()) {
-                saveStatusText.setText("Nama harus diisi");
+                saveStatusText.setText("Name is required");
                 return;
             }
 
             try {
-                saveTopScore(playerName, state.score);
+                highlightedScoreId[0] = saveTopScore(playerName, state.score);
+                List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
+                scoreboardPage[0] = 0;
+                for (int i = 0; i < entries.size(); i++) {
+                    if (highlightedScoreId[0].equals(entries.get(i).entryId)) {
+                        scoreboardPage[0] = i / scoreboardPageSize;
+                        break;
+                    }
+                }
+
                 restartGame.run();
+                refreshScoreboard.run();
+                scoreboardPanel.setVisible(true);
+                scoreboardButton.setText("CLOSE SCOREBOARD");
             } catch (IOException exception) {
-                saveStatusText.setText("Gagal menyimpan score");
+                saveStatusText.setText("Failed to save score");
                 exception.printStackTrace();
             }
         });
@@ -437,7 +598,8 @@ public class EndlessMode extends GameEngine {
             setCenter(ball, state.anchorX + dx, state.anchorY + dy);
             pullLine.setEndX(getCenterX(ball));
             pullLine.setEndY(getCenterY(ball));
-            updateTargetMarker(root, ball, targetMarker, state);
+            // Aim marker sengaja disembunyikan di semua mode selain Tutorial.
+            targetMarker.setVisible(false);
         });
 
         ball.setOnMouseReleased(event -> {

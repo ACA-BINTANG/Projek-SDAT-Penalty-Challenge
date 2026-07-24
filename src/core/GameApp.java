@@ -14,6 +14,9 @@ import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Cursor;
 import javafx.scene.Scene;
+import javafx.scene.input.ContextMenuEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Background;
@@ -73,6 +76,7 @@ public class GameApp extends Application {
     protected static final String TOURNAMENT_BACKGROUND_PATH = "resources/images/Tampilan-BG-Turnament.png";
     protected static final String TOURNAMENT_BRACKET_PATH = "resources/images/Bagan-Tournament.png";
     protected static final String TOURNAMENT_4_BRACKET_PATH = "resources/images/Bagan-Tournament-4-Tim.png";
+    protected static final String TOURNAMENT_TROPHY_PATH = "resources/images/piala.png";
     protected static final String GOAL_BACKGROUND_PATH = "resources/images/GAWANG.png";
     protected static final String BALL_IMAGE_PATH = "resources/images/BOLA.png";
     protected static final String KEEPER_IMAGE_PATH = "resources/images/karakter/keper/berdiri/1.png";
@@ -109,6 +113,9 @@ public class GameApp extends Application {
     protected static final double KEEPER_DIVE_SENSOR_HEIGHT_RATIO = 0.46;
     protected static final double KEEPER_DIVE_SENSOR_X_OFFSET_RATIO = 0.20;
     protected static final double KEEPER_DIVE_SENSOR_Y_OFFSET_RATIO = 0.10;
+    // Sensor ikut miring saat sprite keeper berada pada frame dive diagonal.
+    protected static final double KEEPER_DIVE_SENSOR_FRAME_3_ROTATION = 27.0;
+    protected static final double KEEPER_DIVE_SENSOR_FRAME_4_ROTATION = 31.0;
     protected static final double KEEPER_EDGE_PADDING_RATIO = 0.015;
     protected static final double MAX_PULL_DISTANCE = 230;
     protected static final double MIN_SHOT_DISTANCE = 100;
@@ -119,6 +126,7 @@ public class GameApp extends Application {
     protected static final double SHOT_POWER_CURVE = 1.35;
     protected static final double SHOT_DISTANCE_GOAL_MULTIPLIER = 1.45;
     protected static final double KEEPER_MAX_READ_CHANCE = 0.82;
+    protected static final double KEEPER_INITIAL_READ_CHANCE = 0.15;
     protected static final double KEEPER_READ_GROWTH_PER_POINT = 0.08;
     protected static final double KEEPER_FRAME_SECONDS = 0.19;
     protected static final double KEEPER_LANDING_FRAME_HOLD_SECONDS = 1.0;
@@ -151,7 +159,7 @@ public class GameApp extends Application {
     protected static final double KEEPER_FRAME_5_DOWN_OFFSET = 42;
     protected static final double KEEPER_TOP_REACH_PADDING_RATIO = 0.012;
     protected static final double KEEPER_BOTTOM_REACH_PADDING_RATIO = 0.018;
-    protected static final double SHOT_MEMORY_WEIGHT = 0.35;
+    protected static final double SHOT_MEMORY_WEIGHT = 0.15;
     protected static final double GOAL_LEFT_RATIO = 0.24;
     protected static final double GOAL_RIGHT_RATIO = 0.76;
     protected static final double GOAL_TOP_RATIO = 0.28;
@@ -162,7 +170,8 @@ public class GameApp extends Application {
     protected static final int ROUND_RESULT_GOAL = 2;
     protected static final int ROUND_RESULT_MISS = 3;
     protected static final boolean SHOW_DEBUG_BOXES = false;
-    protected static final int MAX_PLAYER_LIVES = 3;
+    protected static final int MAX_PLAYER_LIVES = 10;
+    protected static final int MAX_ENDLESS_SCOREBOARD_ENTRIES = 30;
     protected static final int TOURNAMENT_SHOTS_PER_ROUND = 5;
     protected static final int MULTIPLAYER_SHOTS_PER_PLAYER = 5;
     protected static final int MULTIPLAYER_SCORE_EMPTY = 0;
@@ -176,7 +185,7 @@ public class GameApp extends Application {
             "JAVA UNITED",
             "PIXEL CITY",
             "BYTE ROVERS",
-            "GARUDA FC",
+            "EAGLE FC",
             "SDAT CLUB",
             "CODE STRIKERS",
             "IDEA ATHLETIC"
@@ -228,6 +237,7 @@ public class GameApp extends Application {
         root.getChildren().addAll(overlay, startButton);
 
         Scene scene = new Scene(root, 1280, 720);
+        disableRightClick(scene);
         stage.setTitle("Penalty Challenge");
         stage.initStyle(StageStyle.UNDECORATED);
         stage.setResizable(false);
@@ -247,7 +257,7 @@ public class GameApp extends Application {
 
         if (!Files.exists(videoPath)) {
             // Jangan membuat aplikasi crash. Menu tetap dapat dibuka lewat START.
-            System.err.println("Intro video tidak ditemukan: " + videoPath);
+            System.err.println("Intro video not found: " + videoPath);
             startIntroAudio();
             return;
         }
@@ -279,11 +289,11 @@ public class GameApp extends Application {
             });
             player.setOnError(() -> {
                 stopIntroStartupRetry();
-                System.err.println("Intro video gagal diputar: " + player.getError());
+                System.err.println("Failed to play intro video: " + player.getError());
             });
             media.setOnError(() -> {
                 stopIntroStartupRetry();
-                System.err.println("Format intro video gagal dibaca: " + media.getError());
+                System.err.println("Unable to read intro video format: " + media.getError());
             });
 
             // Coba play langsung, lalu retry ringan hanya sampai benar-benar PLAYING.
@@ -295,7 +305,7 @@ public class GameApp extends Application {
             introStartupRetryTimeline.play();
         } catch (RuntimeException exception) {
             stopIntroStartupRetry();
-            System.err.println("Intro gagal dimuat: " + exception.getMessage());
+            System.err.println("Failed to load intro: " + exception.getMessage());
             startIntroAudio();
         }
     }
@@ -412,7 +422,7 @@ protected Path resolveResource(String relativePath) {
                 menuAudioPlayer.setVolume(MENU_AUDIO_VOLUME);
                 menuAudioPlayer.play();
             } catch (Exception exception) {
-                System.err.println("Gagal play menu audio: " + exception.getMessage());
+                System.err.println("Failed to play menu audio: " + exception.getMessage());
             }
         }
     }
@@ -434,7 +444,7 @@ protected Path resolveResource(String relativePath) {
             }
             menuClickAudioClip.play(MENU_CLICK_AUDIO_VOLUME);
         } catch (Exception exception) {
-            System.err.println("Gagal play menu click audio: " + exception.getMessage());
+            System.err.println("Failed to play menu click audio: " + exception.getMessage());
         }
     }
 
@@ -453,7 +463,7 @@ protected Path resolveResource(String relativePath) {
                 defaultGameAudioPlayer.play();
                 fadePlayerVolume(defaultGameAudioPlayer, GAME_DEFAULT_AUDIO_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS, true);
             } catch (Exception exception) {
-                System.err.println("Gagal play default audio: " + exception.getMessage());
+                System.err.println("Failed to play default audio: " + exception.getMessage());
             }
         }
     }
@@ -470,7 +480,7 @@ protected Path resolveResource(String relativePath) {
                 defaultGameAudioPlayer.play();
                 fadePlayerVolume(defaultGameAudioPlayer, GAME_DEFAULT_AUDIO_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS, true);
             } catch (Exception exception) {
-                System.err.println("Gagal resume default audio: " + exception.getMessage());
+                System.err.println("Failed to resume default audio: " + exception.getMessage());
             }
         }
     }
@@ -496,7 +506,7 @@ protected Path resolveResource(String relativePath) {
                 defaultGameAudioPlayer.play();
                 fadePlayerVolume(defaultGameAudioPlayer, GAME_DEFAULT_DUCK_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS, true);
             } catch (Exception exception) {
-                System.err.println("Gagal duck default audio: " + exception.getMessage());
+                System.err.println("Failed to lower default audio: " + exception.getMessage());
             }
         }
 
@@ -514,7 +524,7 @@ protected Path resolveResource(String relativePath) {
             resumeDefaultGameAudioIfNeeded();
         });
         player.setOnError(() -> {
-            System.err.println("Gagal memutar effect audio: " + player.getError());
+            System.err.println("Failed to play audio effect: " + player.getError());
             stopEffectGameAudio(true);
             resumeDefaultGameAudioIfNeeded();
         });
@@ -524,7 +534,7 @@ protected Path resolveResource(String relativePath) {
             player.play();
             fadePlayerVolume(player, GAME_EFFECT_AUDIO_VOLUME, GAME_AUDIO_CROSSFADE_SECONDS * 0.60, false);
         } catch (Exception exception) {
-            System.err.println("Gagal play effect audio: " + exception.getMessage());
+            System.err.println("Failed to play audio effect: " + exception.getMessage());
             stopEffectGameAudio(true);
             resumeDefaultGameAudioIfNeeded();
         }
@@ -533,7 +543,7 @@ protected Path resolveResource(String relativePath) {
     protected MediaPlayer createAudioPlayer(String audioPath, double volume, boolean loop) {
         Path path = resolveResource(audioPath);
         if (!Files.exists(path)) {
-            System.err.println("Audio tidak ditemukan: " + path);
+            System.err.println("Audio not found: " + path);
             return null;
         }
 
@@ -542,11 +552,11 @@ protected Path resolveResource(String relativePath) {
             MediaPlayer player = new MediaPlayer(media);
             player.setVolume(volume);
             player.setCycleCount(loop ? MediaPlayer.INDEFINITE : 1);
-            media.setOnError(() -> System.err.println("Format audio tidak bisa dibaca: " + media.getError()));
+            media.setOnError(() -> System.err.println("Unable to read audio format: " + media.getError()));
             player.setOnError(() -> System.err.println("MediaPlayer audio error: " + player.getError()));
             return player;
         } catch (Exception exception) {
-            System.err.println("Gagal load audio " + audioPath + ": " + exception.getMessage());
+            System.err.println("Failed to load audio " + audioPath + ": " + exception.getMessage());
             return null;
         }
     }
@@ -559,7 +569,7 @@ protected Path resolveResource(String relativePath) {
             player.seek(Duration.ZERO);
             player.play();
         } catch (Exception exception) {
-            System.err.println("Gagal play audio: " + exception.getMessage());
+            System.err.println("Failed to play audio: " + exception.getMessage());
         }
     }
 
@@ -594,7 +604,7 @@ protected Path resolveResource(String relativePath) {
         try {
             effectGameAudioPlayer.stop();
         } catch (Exception exception) {
-            System.err.println("Gagal stop effect audio: " + exception.getMessage());
+            System.err.println("Failed to stop audio effect: " + exception.getMessage());
         }
         if (dispose) {
             disposeMediaPlayer(effectGameAudioPlayer);
@@ -621,7 +631,7 @@ protected Path resolveResource(String relativePath) {
             player.stop();
             player.dispose();
         } catch (Exception exception) {
-            System.err.println("Gagal dispose media player: " + exception.getMessage());
+            System.err.println("Failed to dispose media player: " + exception.getMessage());
         }
     }
 
@@ -702,10 +712,32 @@ protected Path resolveResource(String relativePath) {
         stage.setHeight(bounds.getHeight());
     }
 
+    /**
+     * Mematikan klik kanan secara global untuk sebuah Scene.
+     * Semua event mouse sekunder (tekan, tahan/drag, lepas, klik) dan
+     * permintaan context menu langsung dihentikan sebelum mencapai kontrol game.
+     */
+    protected void disableRightClick(Scene scene) {
+        if (scene == null) {
+            return;
+        }
+
+        scene.addEventFilter(MouseEvent.ANY, event -> {
+            if (event.getButton() == MouseButton.SECONDARY || event.isSecondaryButtonDown()) {
+                event.consume();
+            }
+        });
+
+        scene.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> event.consume());
+    }
+
     protected void setSceneSmooth(Stage stage, Scene nextScene, Runnable afterSceneSwitch) {
         if (stage == null || nextScene == null) {
             return;
         }
+
+        // Klik kanan dimatikan untuk semua scene yang berpindah melalui helper ini.
+        disableRightClick(nextScene);
 
         // Perpindahan scene dibuat langsung tanpa fade/opacity agar tidak menimbulkan
         // efek kedip atau layar hitam di antara mode.

@@ -11,6 +11,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Background;
@@ -57,12 +58,15 @@ public class TournamentMode extends GameEngine {
         keeper.setPreserveRatio(true);
         KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
         keeperAnimator.showIdle();
+        // Tournament mulai dari halaman bagan, jadi actor harus tersembunyi sebelum Scene dipasang.
+        keeper.setVisible(false);
 
         ImageView ball = createImageView(BALL_IMAGE_PATH);
         ball.setFitWidth(BALL_SIZE);
         ball.setFitHeight(BALL_SIZE);
         ball.setPreserveRatio(true);
         ball.setCursor(Cursor.HAND);
+        ball.setVisible(false);
 
         Line pullLine = new Line();
         pullLine.setStroke(Color.rgb(255, 255, 255, 0.75));
@@ -76,6 +80,8 @@ public class TournamentMode extends GameEngine {
         targetMarker.setMouseTransparent(true);
         targetMarker.setVisible(false);
 
+        // HUD hitam hanya dipakai saat pertandingan berlangsung.
+        // Pada halaman pemilihan 4/8 tim, kotak dan seluruh tulisan HUD disembunyikan.
         Rectangle topHudBackground = createTopHudBackground(root, 122);
 
         Text roundText = new Text();
@@ -100,23 +106,9 @@ public class TournamentMode extends GameEngine {
         shotsText.setLayoutX(32);
         shotsText.setLayoutY(78);
 
-        Text totalText = new Text();
-        totalText.setFill(Color.WHITE);
-        totalText.setFont(loadFont(MENU_FONT_PATH, 20, Font.font("Arial", FontWeight.BOLD, 20)));
-        totalText.layoutXProperty().bind(root.widthProperty().subtract(210));
-        totalText.setLayoutY(48);
-
-        Text hintText = new Text("Tarik bola, lalu lepas");
-        hintText.setFill(Color.rgb(255, 255, 255, 0.82));
-        hintText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
-        hintText.layoutXProperty().bind(root.widthProperty().subtract(250));
-        hintText.setLayoutY(78);
-
-        Text shortcutText = new Text("ESC = MENU");
-        shortcutText.setFill(Color.rgb(255, 255, 255, 0.9));
-        shortcutText.setFont(loadFont(MENU_FONT_PATH, 15, Font.font("Arial", FontWeight.BOLD, 15)));
-        shortcutText.setLayoutX(32);
-        shortcutText.setLayoutY(108);
+        Button menuButton = createGameplayMenuButton(stage);
+        StackPane.setAlignment(menuButton, Pos.TOP_RIGHT);
+        StackPane.setMargin(menuButton, new Insets(18, 28, 0, 0));
 
         Text goalText = createGoalText(root);
 
@@ -126,10 +118,27 @@ public class TournamentMode extends GameEngine {
         resultOverlay.setFill(Color.rgb(0, 0, 0, 0.62));
         resultOverlay.setVisible(false);
 
+        ImageView resultTrophy = createImageView(TOURNAMENT_TROPHY_PATH);
+        resultTrophy.setFitWidth(245);
+        resultTrophy.setFitHeight(245);
+        resultTrophy.setPreserveRatio(true);
+        resultTrophy.setMouseTransparent(true);
+        DropShadow trophyGlow = new DropShadow();
+        trophyGlow.setColor(Color.rgb(255, 205, 35, 0.98));
+        trophyGlow.setRadius(62);
+        trophyGlow.setSpread(0.48);
+        trophyGlow.setOffsetX(0);
+        trophyGlow.setOffsetY(0);
+        resultTrophy.setEffect(trophyGlow);
+        resultTrophy.setVisible(false);
+        resultTrophy.setManaged(false);
+
         Text resultTitle = new Text();
-        resultTitle.setFill(Color.WHITE);
+        resultTitle.setFill(Color.rgb(255, 220, 55));
+        resultTitle.setStroke(Color.rgb(0, 0, 0, 0.96));
+        resultTitle.setStrokeWidth(2.2);
         resultTitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-        resultTitle.setFont(loadFont(MENU_FONT_PATH, 40, Font.font("Arial", FontWeight.EXTRA_BOLD, 40)));
+        resultTitle.setFont(loadFont(MENU_FONT_PATH, 46, Font.font("Arial Black", FontWeight.EXTRA_BOLD, 46)));
         resultTitle.setMouseTransparent(true);
 
         Text resultDetail = new Text();
@@ -137,25 +146,33 @@ public class TournamentMode extends GameEngine {
         resultDetail.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         resultDetail.setFont(loadFont(MENU_FONT_PATH, 19, Font.font("Arial", FontWeight.BOLD, 19)));
         resultDetail.setMouseTransparent(true);
+        resultDetail.setVisible(false);
+        resultDetail.setManaged(false);
 
-        Button primaryButton = new Button("LANJUT");
-        primaryButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+        Button primaryButton = new Button("CONTINUE");
+        primaryButton.setFont(Font.font("Arial", FontWeight.EXTRA_BOLD, 15));
         primaryButton.setCursor(Cursor.HAND);
+        applyTournamentBlueButtonStyle(primaryButton);
 
         HBox resultButtons = new HBox(12, primaryButton);
         resultButtons.setAlignment(Pos.CENTER);
 
-        VBox resultBox = new VBox(14, resultTitle, resultDetail, resultButtons);
+        VBox resultBox = new VBox(12, resultTrophy, resultTitle, resultDetail, resultButtons);
         resultBox.setAlignment(Pos.CENTER);
         resultBox.setPadding(new Insets(18));
-        resultBox.setBackground(new Background(new BackgroundFill(Color.rgb(0, 0, 0, 0.72), new CornerRadii(8), Insets.EMPTY)));
-        resultBox.setMaxWidth(470);
+        resultBox.setBackground(Background.EMPTY);
+        resultBox.setMaxWidth(560);
+        resultBox.getProperties().put("resultTrophy", resultTrophy);
         resultBox.layoutXProperty().bind(Bindings.createDoubleBinding(
                 () -> (root.getWidth() - resultBox.getBoundsInLocal().getWidth()) / 2,
                 root.widthProperty(),
                 resultBox.boundsInLocalProperty()
         ));
-        resultBox.layoutYProperty().bind(root.heightProperty().multiply(0.42));
+        resultBox.layoutYProperty().bind(Bindings.createDoubleBinding(
+                () -> Math.max(40, (root.getHeight() - resultBox.getBoundsInLocal().getHeight()) / 2),
+                root.heightProperty(),
+                resultBox.boundsInLocalProperty()
+        ));
         resultBox.setVisible(false);
 
         Label[] bracketLabels = new Label[15];
@@ -168,6 +185,14 @@ public class TournamentMode extends GameEngine {
         TextField teamNameInput = (TextField) bracketOverlay.getProperties().get("teamNameInput");
         Text setupStatusText = (Text) bracketOverlay.getProperties().get("setupStatusText");
         StackPane bracketHolder = (StackPane) bracketOverlay.getProperties().get("bracketHolder");
+
+        // Saat bagan/pilihan 4 dan 8 tim tampil, HUD gameplay harus benar-benar hilang.
+        // Begitu START ditekan dan bracket disembunyikan, HUD otomatis muncul kembali.
+        topHudBackground.visibleProperty().bind(bracketOverlay.visibleProperty().not());
+        roundText.visibleProperty().bind(bracketOverlay.visibleProperty().not());
+        targetText.visibleProperty().bind(bracketOverlay.visibleProperty().not());
+        shotsText.visibleProperty().bind(bracketOverlay.visibleProperty().not());
+
         Runnable unlockTournamentSetup = () -> {
             teamNameInput.setDisable(false);
             fourTeamButton.setDisable(false);
@@ -181,7 +206,6 @@ public class TournamentMode extends GameEngine {
 
         playLayer.getChildren().addAll(
                 pullLine,
-                targetMarker,
                 keeper,
                 ball,
                 goalText,
@@ -189,19 +213,16 @@ public class TournamentMode extends GameEngine {
                 roundText,
                 targetText,
                 shotsText,
-                totalText,
-                hintText,
-                shortcutText,
                 resultOverlay,
                 resultBox,
                 bracketOverlay
         );
-        root.getChildren().addAll(background, playLayer);
+        root.getChildren().addAll(background, playLayer, menuButton);
 
         Scene scene = new Scene(root, 1280, 720);
-        setSceneSmooth(stage, scene, this::startGameplayDefaultAudio);
         ball.setCursor(Cursor.DEFAULT);
         setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
+        setSceneSmooth(stage, scene, this::startGameplayDefaultAudio);
 
         // 2. MENYIAPKAN DATA / STATE PERMAINAN
 
@@ -209,9 +230,20 @@ public class TournamentMode extends GameEngine {
         state.teamCount = 8;
         state.playerTeamName = "PLAYER FC";
         prepareEightTeamBracket(state);
-        Runnable resetRound = () -> resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state, keeperAnimator);
+        Runnable resetRound = () -> {
+            resetEndlessRound(root, ball, keeper, pullLine, targetMarker, state, keeperAnimator);
+            state.ballBehindKeeper = false;
+            moveBallInFrontOfKeeper(ball, keeper);
+
+            // resetEndlessRound selalu menampilkan bola. Saat halaman bagan terbuka,
+            // paksa semua actor gameplay tetap tersembunyi agar bola tidak muncul di tengah lapangan.
+            if (bracketOverlay.isVisible()) {
+                setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
+                ball.setCursor(Cursor.DEFAULT);
+            }
+        };
         Runnable refreshUi = () -> {
-            updateTournamentTexts(roundText, targetText, shotsText, totalText, state);
+            updateTournamentTexts(roundText, targetText, shotsText, state);
             updateTournamentBracketLabels(bracketLabels, state);
         };
         Runnable backToBracket = () -> {
@@ -246,8 +278,9 @@ public class TournamentMode extends GameEngine {
                 state.fourTeamPlayerSlot = -1;
             }
             teamNameInput.setText(state.playerTeamName);
-            setupStatusText.setText("Isi nama tim, pilih jumlah tim, lalu mulai");
-            startMatchButton.setText("MULAI");
+            setupStatusText.setText("");
+            setupStatusText.setVisible(false);
+            startMatchButton.setText("START");
             unlockTournamentSetup.run();
             ball.setCursor(Cursor.DEFAULT);
             resultOverlay.setVisible(false);
@@ -262,6 +295,10 @@ public class TournamentMode extends GameEngine {
         root.widthProperty().addListener((observable, oldValue, newValue) -> resetRound.run());
         root.heightProperty().addListener((observable, oldValue, newValue) -> resetRound.run());
         teamNameInput.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue.trim().isEmpty()) {
+                setupStatusText.setText("");
+                setupStatusText.setVisible(false);
+            }
             if (!state.setupDone) {
                 state.playerTeamName = cleanTeamName(newValue);
                 if (state.teamCount <= 4
@@ -289,8 +326,18 @@ public class TournamentMode extends GameEngine {
         });
 
         primaryButton.setOnAction(event -> {
+            // Setelah popup hasil ditekan, barulah berpindah dari halaman gawang ke bagan tournament.
+            resultOverlay.setVisible(false);
+            resultBox.setVisible(false);
+            setImage(background, TOURNAMENT_BACKGROUND_PATH);
+            bracketOverlay.setVisible(true);
+            ball.setCursor(Cursor.DEFAULT);
+
             if (state.champion || state.eliminated) {
-                restartTournament.run();
+                startMatchButton.setText("RESTART");
+                refreshUi.run();
+                resetRound.run();
+                setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
                 return;
             }
 
@@ -298,20 +345,17 @@ public class TournamentMode extends GameEngine {
             state.roundGoals = 0;
             state.shotsTaken = 0;
             state.roundFinished = false;
-            resultOverlay.setVisible(false);
-            resultBox.setVisible(false);
-            setImage(background, TOURNAMENT_BACKGROUND_PATH);
-            bracketOverlay.setVisible(true);
-            setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
-            ball.setCursor(Cursor.DEFAULT);
+            startMatchButton.setText("START ROUND");
             refreshUi.run();
             resetRound.run();
+            setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, false);
         });
         fourTeamButton.setOnAction(event -> {
             state.teamCount = 4;
             prepareFourTeamBracket(state);
             rebuildTournamentBracketBoard(bracketHolder, bracketLabels, state.teamCount);
-            setupStatusText.setText("Turnamen 4 tim dipilih - posisi tim diacak");
+            setupStatusText.setText("");
+            setupStatusText.setVisible(false);
             refreshUi.run();
         });
         eightTeamButton.setOnAction(event -> {
@@ -320,19 +364,21 @@ public class TournamentMode extends GameEngine {
             state.fourTeamParticipants = null;
             state.fourTeamPlayerSlot = -1;
             rebuildTournamentBracketBoard(bracketHolder, bracketLabels, state.teamCount);
-            setupStatusText.setText("Turnamen 8 tim dipilih - posisi tim diacak");
+            setupStatusText.setText("");
+            setupStatusText.setVisible(false);
             refreshUi.run();
         });
         startMatchButton.setOnAction(event -> {
             if (state.champion || state.eliminated) {
-                startMatchButton.setText("MULAI");
+                startMatchButton.setText("START");
                 restartTournament.run();
                 return;
             }
             if (!state.setupDone) {
                 String teamName = teamNameInput.getText().trim();
                 if (teamName.isEmpty()) {
-                    setupStatusText.setText("Nama tim harus diisi");
+                    setupStatusText.setText("Team name is required");
+                    setupStatusText.setVisible(true);
                     return;
                 }
                 state.playerTeamName = cleanTeamName(teamName);
@@ -363,14 +409,17 @@ public class TournamentMode extends GameEngine {
                 state.eliminated = false;
                 state.champion = false;
                 state.setupDone = true;
+                setupStatusText.setText("");
+                setupStatusText.setVisible(false);
                 lockTournamentSetup.run();
                 refreshUi.run();
             }
             setImage(background, GOAL_BACKGROUND_PATH);
             bracketOverlay.setVisible(false);
+            // Hitung posisi dulu dalam keadaan tersembunyi, lalu tampilkan tanpa kedipan.
+            resetRound.run();
             setTournamentPlayObjectsVisible(ball, keeper, pullLine, targetMarker, true);
             ball.setCursor(Cursor.HAND);
-            resetRound.run();
         });
         // 3. INPUT KEYBOARD
 
@@ -415,7 +464,8 @@ public class TournamentMode extends GameEngine {
             setCenter(ball, state.anchorX + dx, state.anchorY + dy);
             pullLine.setEndX(getCenterX(ball));
             pullLine.setEndY(getCenterY(ball));
-            updateTargetMarker(root, ball, targetMarker, state);
+            // Aim marker sengaja disembunyikan di semua mode selain Tutorial.
+            targetMarker.setVisible(false);
         });
 
         ball.setOnMouseReleased(event -> {

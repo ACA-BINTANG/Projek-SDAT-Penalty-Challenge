@@ -24,6 +24,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.stage.Stage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -77,6 +78,37 @@ public class GameEngine extends GameApp {
         button.setOnMouseExited(event -> button.setStyle(normalStyle));
     }
 
+    protected Button createGameplayMenuButton(Stage stage) {
+        String normalStyle =
+                "-fx-background-color: #145AD8;" +
+                "-fx-text-fill: white;" +
+                "-fx-border-color: white;" +
+                "-fx-border-width: 3;" +
+                "-fx-background-radius: 5;" +
+                "-fx-border-radius: 5;" +
+                "-fx-padding: 8 20 8 20;";
+        String hoverStyle =
+                "-fx-background-color: #2474F2;" +
+                "-fx-text-fill: white;" +
+                "-fx-border-color: white;" +
+                "-fx-border-width: 3;" +
+                "-fx-background-radius: 5;" +
+                "-fx-border-radius: 5;" +
+                "-fx-padding: 8 20 8 20;";
+
+        Button button = new Button("MENU");
+        button.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.EXTRA_BOLD, 16)));
+        button.setCursor(Cursor.HAND);
+        button.setFocusTraversable(false);
+        button.setMinWidth(112);
+        button.setMinHeight(42);
+        button.setStyle(normalStyle);
+        button.setOnMouseEntered(event -> button.setStyle(hoverStyle));
+        button.setOnMouseExited(event -> button.setStyle(normalStyle));
+        button.setOnAction(event -> showMenu(stage));
+        return button;
+    }
+
     protected Button createNavigationButton(String text) {
         Button button = new Button(text);
         button.setFont(Font.font("Arial", FontWeight.BOLD, 13));
@@ -113,17 +145,17 @@ public class GameEngine extends GameApp {
         Rectangle dim = new Rectangle();
         dim.setFill(Color.rgb(0, 0, 0, 0.18));
 
-        Text title = new Text("BAGAN TIM");
+        Text title = new Text("TEAM BRACKET");
         title.setFill(Color.WHITE);
         title.setFont(loadFont(MENU_FONT_PATH, 34, Font.font("Arial", FontWeight.EXTRA_BOLD, 34)));
 
         TextField teamNameInput = new TextField("PLAYER FC");
-        teamNameInput.setPromptText("Nama tim kamu");
+        teamNameInput.setPromptText("Your team name");
         teamNameInput.setMaxWidth(260);
         teamNameInput.setFont(Font.font("Arial", FontWeight.BOLD, 15));
 
-        Button fourTeamButton = new Button("4 TIM");
-        Button eightTeamButton = new Button("8 TIM");
+        Button fourTeamButton = new Button("4 TEAMS");
+        Button eightTeamButton = new Button("8 TEAMS");
         fourTeamButton.setFont(Font.font("Arial", FontWeight.BOLD, 13));
         eightTeamButton.setFont(Font.font("Arial", FontWeight.BOLD, 13));
         fourTeamButton.setCursor(Cursor.HAND);
@@ -134,9 +166,12 @@ public class GameEngine extends GameApp {
         HBox teamCountBox = new HBox(10, fourTeamButton, eightTeamButton);
         teamCountBox.setAlignment(Pos.CENTER);
 
-        Text setupStatusText = new Text("Isi nama tim, pilih jumlah tim, lalu mulai");
+        // Area status hanya dipakai untuk pesan error, bukan petunjuk/tutorial.
+        Text setupStatusText = new Text("");
         setupStatusText.setFill(Color.rgb(255, 230, 120));
         setupStatusText.setFont(Font.font("Arial", FontWeight.BOLD, 13));
+        setupStatusText.setVisible(false);
+        setupStatusText.managedProperty().bind(setupStatusText.visibleProperty());
 
         VBox setupBox = new VBox(8, teamNameInput, teamCountBox, setupStatusText);
         setupBox.setAlignment(Pos.CENTER);
@@ -144,19 +179,16 @@ public class GameEngine extends GameApp {
         StackPane bracketHolder = new StackPane();
         rebuildTournamentBracketBoard(bracketHolder, bracketLabels, 8);
 
-        Button startMatchButton = new Button("MULAI");
+        Button startMatchButton = new Button("START");
         startMatchButton.setFont(Font.font("Arial", FontWeight.BOLD, 14));
         startMatchButton.setCursor(Cursor.HAND);
         applyTournamentBlueButtonStyle(startMatchButton);
 
-        Text exitHint = new Text("TEKAN ESC UNTUK KEMBALI KE MENU");
-        exitHint.setFill(Color.WHITE);
-        exitHint.setFont(loadFont(MENU_FONT_PATH, 14, Font.font("Arial", FontWeight.BOLD, 14)));
-
         HBox actions = new HBox(12, startMatchButton);
         actions.setAlignment(Pos.CENTER);
 
-        VBox content = new VBox(14, title, setupBox, bracketHolder, actions, exitHint);
+        // Tidak ada teks tutorial/petunjuk di bawah tombol START/RESTART.
+        VBox content = new VBox(14, title, setupBox, bracketHolder, actions);
         content.setAlignment(Pos.CENTER);
         content.setPadding(new Insets(24));
         content.setBackground(new Background(new BackgroundFill(Color.TRANSPARENT, CornerRadii.EMPTY, Insets.EMPTY)));
@@ -185,10 +217,12 @@ public class GameEngine extends GameApp {
     }
 
     protected StackPane createEightTeamBracketBoard(Label[] bracketLabels) {
+        // Gambar bracket baru berukuran 1600 x 800. Ukuran board mengikuti rasio
+        // aslinya supaya gambar tidak tertarik/gepeng saat ditampilkan.
         double boardWidth = 920;
-        double boardHeight = 517.5;
+        double boardHeight = 460;
         double scaleX = boardWidth / 1600.0;
-        double scaleY = boardHeight / 900.0;
+        double scaleY = boardHeight / 800.0;
 
         ImageView bracketImage = createImageView(TOURNAMENT_BRACKET_PATH);
         bracketImage.setPreserveRatio(false);
@@ -201,21 +235,31 @@ public class GameEngine extends GameApp {
         labels.setMaxSize(boardWidth, boardHeight);
         labels.setMouseTransparent(true);
 
-        // 0-7  = delapan peserta awal.
-        // 8-11 = empat pemenang quarter final.
-        // 12   = kotak final/juara warna kuning.
-        // Posisi disesuaikan dengan titik tengah kotak pada Bagan-Tournament.png.
+        // Susunan label mengikuti gambar Bagan-Tournament.png yang baru:
+        // 0-7   = delapan peserta awal.
+        // 8-11  = empat pemenang ronde pertama / quarter-final.
+        // 12-13 = dua pemenang semifinal / finalis.
+        // 14    = juara pada kotak tengah ber-outline emas.
+        // Semua koordinat di bawah memakai koordinat asli gambar 1600 x 800.
         double[][] labelPositions = {
-                {195, 211}, {195, 370}, {195, 536}, {195, 698},
-                {1403, 211}, {1403, 370}, {1403, 536}, {1403, 698},
-                {505, 297}, {1103, 297}, {505, 617}, {1103, 617},
-                {800, 451}
+                // Tim awal - sisi kiri.
+                {158, 178}, {158, 310}, {158, 491}, {158, 619},
+                // Tim awal - sisi kanan.
+                {1442, 178}, {1442, 310}, {1442, 491}, {1442, 619},
+                // Empat pemenang ronde pertama.
+                {468, 255}, {1133, 256}, {468, 554}, {1133, 554},
+                // Dua finalis.
+                {506, 403}, {1093, 403},
+                // Juara.
+                {800, 403}
         };
 
+        // Lebar label disesuaikan dengan ruang kosong di dalam masing-masing kotak.
         double[] widths = {
-                136, 136, 136, 136, 136, 136, 136, 136,
-                96, 96, 96, 96,
-                170
+                132, 132, 132, 132, 132, 132, 132, 132,
+                116, 116, 116, 116,
+                150, 150,
+                132
         };
 
         for (int i = 0; i < labelPositions.length; i++) {
@@ -225,18 +269,16 @@ public class GameEngine extends GameApp {
             if (i < 8) {
                 label.setFont(loadFont(MENU_FONT_PATH, 9.5, Font.font("Arial", FontWeight.BOLD, 9.5)));
             } else if (i < 12) {
-                label.setFont(loadFont(MENU_FONT_PATH, 8.5, Font.font("Arial", FontWeight.BOLD, 8.5)));
-            } else {
                 label.setFont(loadFont(MENU_FONT_PATH, 9, Font.font("Arial", FontWeight.BOLD, 9)));
-                label.setMinHeight(48);
-                label.setPrefHeight(48);
-                label.setMaxHeight(48);
-                label.setWrapText(true);
+            } else if (i < 14) {
+                label.setFont(loadFont(MENU_FONT_PATH, 9.5, Font.font("Arial", FontWeight.BOLD, 9.5)));
+            } else {
+                label.setFont(loadFont(MENU_FONT_PATH, 10, Font.font("Arial", FontWeight.BOLD, 10)));
             }
 
             double centerX = labelPositions[i][0] * scaleX;
             double centerY = labelPositions[i][1] * scaleY;
-            double labelHeight = i == 12 ? 48 : 24;
+            double labelHeight = 24;
             label.setLayoutX(centerX - labelWidth / 2);
             label.setLayoutY(centerY - labelHeight / 2);
             bracketLabels[i] = label;
@@ -354,69 +396,83 @@ public class GameEngine extends GameApp {
                 );
             }
 
-            int playerSemiSlot = state.fourTeamPlayerSlot < 2 ? 4 : 5;
-            int otherSemiSlot = playerSemiSlot == 4 ? 5 : 4;
-            if (state.roundIndex > 0 || state.champion) {
-                setBracketLabel(bracketLabels, playerSemiSlot, playerTeam, true);
-                setBracketLabel(bracketLabels, otherSemiSlot, getTournamentOpponent(state, 1), false);
-            }
-        } else {
-            if (state.eightTeamParticipants == null || state.eightTeamParticipants.length != 8) {
-                prepareEightTeamBracket(state);
-            }
-
-            // Delapan slot awal selalu langsung terisi. Posisi PLAYER juga diacak.
-            for (int i = 0; i < 8; i++) {
+            if ((state.roundIndex > 0 || state.eliminated || state.champion)
+                    && state.fourTeamSemifinalWinners != null) {
                 setBracketLabel(
                         bracketLabels,
-                        i,
-                        state.eightTeamParticipants[i],
-                        i == state.eightTeamPlayerSlot
+                        4,
+                        state.fourTeamSemifinalWinners[0],
+                        playerTeam.equals(state.fourTeamSemifinalWinners[0])
+                );
+                setBracketLabel(
+                        bracketLabels,
+                        5,
+                        state.fourTeamSemifinalWinners[1],
+                        playerTeam.equals(state.fourTeamSemifinalWinners[1])
                 );
             }
 
-            int playerPair = state.eightTeamPlayerSlot / 2;
-            int otherPair = getEightTeamOtherPairOnSameSide(playerPair);
-
-            if (state.roundIndex > 0 || state.champion) {
-                // Isi semua kotak quarter-final winner supaya bagan tidak terlihat kosong.
-                for (int pair = 0; pair < 4; pair++) {
-                    int winnerLabel = getEightTeamQuarterWinnerLabel(pair);
-                    String winnerName;
-                    boolean isPlayerWinner = pair == playerPair;
-
-                    if (isPlayerWinner) {
-                        winnerName = playerTeam;
-                    } else if (pair == otherPair) {
-                        winnerName = getTournamentOpponent(state, 1);
-                    } else {
-                        int participantStart = pair * 2;
-                        winnerName = state.eightTeamParticipants[participantStart];
-                    }
-
-                    setBracketLabel(bracketLabels, winnerLabel, winnerName, isPlayerWinner);
-                }
-            }
-
-            if (state.roundIndex > 1 && !state.champion && !state.eliminated) {
-                // Gambar 8 tim hanya memiliki satu kotak tengah. Gunakan kotak kuning
-                // tersebut untuk menampilkan pasangan final agar nama tidak mengambang.
+            if ((state.eliminated || state.champion) && state.tournamentChampionName != null) {
                 setBracketLabel(
                         bracketLabels,
-                        12,
-                        playerTeam + "\nVS " + getTournamentOpponent(state, 2),
-                        true
+                        6,
+                        state.tournamentChampionName,
+                        playerTeam.equals(state.tournamentChampionName)
+                );
+            }
+            return;
+        }
+
+        if (state.eightTeamParticipants == null || state.eightTeamParticipants.length != 8) {
+            prepareEightTeamBracket(state);
+        }
+
+        for (int i = 0; i < 8; i++) {
+            setBracketLabel(
+                    bracketLabels,
+                    i,
+                    state.eightTeamParticipants[i],
+                    i == state.eightTeamPlayerSlot
+            );
+        }
+
+        if ((state.roundIndex > 0 || state.eliminated || state.champion)
+                && state.eightTeamQuarterWinners != null) {
+            for (int pair = 0; pair < 4; pair++) {
+                int winnerLabel = getEightTeamQuarterWinnerLabel(pair);
+                String winnerName = state.eightTeamQuarterWinners[pair];
+                setBracketLabel(
+                        bracketLabels,
+                        winnerLabel,
+                        winnerName,
+                        playerTeam.equals(winnerName)
                 );
             }
         }
 
-        int championLabelIndex = state.teamCount <= 4 ? 6 : 12;
-        if (state.champion) {
-            setBracketLabel(bracketLabels, championLabelIndex, playerTeam, true);
+        if ((state.roundIndex > 1 || state.eliminated || state.champion)
+                && state.eightTeamSemifinalWinners != null) {
+            setBracketLabel(
+                    bracketLabels,
+                    12,
+                    state.eightTeamSemifinalWinners[0],
+                    playerTeam.equals(state.eightTeamSemifinalWinners[0])
+            );
+            setBracketLabel(
+                    bracketLabels,
+                    13,
+                    state.eightTeamSemifinalWinners[1],
+                    playerTeam.equals(state.eightTeamSemifinalWinners[1])
+            );
         }
 
-        if (state.eliminated) {
-            setBracketLabel(bracketLabels, championLabelIndex, "TERHENTI", false);
+        if ((state.eliminated || state.champion) && state.tournamentChampionName != null) {
+            setBracketLabel(
+                    bracketLabels,
+                    14,
+                    state.tournamentChampionName,
+                    playerTeam.equals(state.tournamentChampionName)
+            );
         }
     }
 
@@ -439,6 +495,94 @@ public class GameEngine extends GameApp {
         if (targetMarker != null) {
             targetMarker.setVisible(false);
         }
+    }
+
+    /**
+     * Mengubah urutan layer bola dan keeper tanpa mengganggu HUD atau overlay lain.
+     * Bola berada di depan saat mulai menendang, lalu dipindahkan ke belakang keeper
+     * ketika sudah memasuki area gawang agar tidak terlihat menembus karakter.
+     */
+    protected void moveBallBehindKeeper(ImageView ball, ImageView keeper) {
+        swapActorLayerOrder(ball, keeper, false);
+    }
+
+    protected void moveBallInFrontOfKeeper(ImageView ball, ImageView keeper) {
+        swapActorLayerOrder(ball, keeper, true);
+    }
+
+    private void swapActorLayerOrder(ImageView ball, ImageView keeper, boolean ballInFront) {
+        if (ball == null || keeper == null || ball.getParent() == null || ball.getParent() != keeper.getParent()) {
+            return;
+        }
+        if (!(ball.getParent() instanceof Pane pane)) {
+            return;
+        }
+
+        int ballIndex = pane.getChildren().indexOf(ball);
+        int keeperIndex = pane.getChildren().indexOf(keeper);
+        if (ballIndex < 0 || keeperIndex < 0) {
+            return;
+        }
+
+        boolean alreadyCorrect = ballInFront ? ballIndex > keeperIndex : ballIndex < keeperIndex;
+        if (alreadyCorrect) {
+            return;
+        }
+
+        // Jangan memakai Collections.swap() pada children JavaFX.
+        // VetoableListDecorator bisa menganggap proses swap sebagai penambahan Node yang sama dua kali.
+        // Pindahkan hanya Node bola, sehingga yang berubah cuma posisi Z relatif bola terhadap keeper.
+        pane.getChildren().remove(ball);
+        int currentKeeperIndex = pane.getChildren().indexOf(keeper);
+        if (currentKeeperIndex < 0) {
+            return;
+        }
+
+        int targetIndex = ballInFront
+                ? Math.min(currentKeeperIndex + 1, pane.getChildren().size())
+                : currentKeeperIndex;
+        pane.getChildren().add(targetIndex, ball);
+    }
+
+    protected void playTournamentVictoryAnimation(VBox resultBox, Text resultTitle, boolean champion) {
+        if (resultBox == null || resultTitle == null) {
+            return;
+        }
+
+        resultBox.setOpacity(0);
+        resultBox.setScaleX(0.72);
+        resultBox.setScaleY(0.72);
+        resultTitle.setScaleX(1);
+        resultTitle.setScaleY(1);
+        resultTitle.setFill(champion ? Color.rgb(255, 220, 55) : Color.WHITE);
+
+        javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(
+                javafx.util.Duration.millis(220), resultBox
+        );
+        fade.setFromValue(0);
+        fade.setToValue(1);
+
+        javafx.animation.ScaleTransition pop = new javafx.animation.ScaleTransition(
+                javafx.util.Duration.millis(300), resultBox
+        );
+        pop.setFromX(0.72);
+        pop.setFromY(0.72);
+        pop.setToX(1.0);
+        pop.setToY(1.0);
+
+        javafx.animation.ParallelTransition intro = new javafx.animation.ParallelTransition(fade, pop);
+        intro.play();
+
+        javafx.animation.ScaleTransition titlePulse = new javafx.animation.ScaleTransition(
+                javafx.util.Duration.millis(champion ? 330 : 260), resultTitle
+        );
+        titlePulse.setFromX(1.0);
+        titlePulse.setFromY(1.0);
+        titlePulse.setToX(champion ? 1.16 : 1.08);
+        titlePulse.setToY(champion ? 1.16 : 1.08);
+        titlePulse.setAutoReverse(true);
+        titlePulse.setCycleCount(champion ? 6 : 2);
+        titlePulse.play();
     }
 
     protected void setBracketLabel(Label[] bracketLabels, int index, String value, boolean playerTeam) {
@@ -469,8 +613,8 @@ public class GameEngine extends GameApp {
 
         int maxLength;
         if (index >= 8 && index <= 11) {
-            maxLength = 11;
-        } else if (index == 12 || index == 14) {
+            maxLength = 14;
+        } else if (index >= 12 && index <= 14) {
             maxLength = 18;
         } else {
             maxLength = 13;
@@ -520,15 +664,21 @@ public class GameEngine extends GameApp {
             }
         }
 
+        int playerSide = playerSlot < 2 ? 0 : 1;
         int semifinalOpponentSlot = playerSlot % 2 == 0 ? playerSlot + 1 : playerSlot - 1;
-        int otherPairStart = playerSlot < 2 ? 2 : 0;
+        int otherPairStart = playerSide == 0 ? 2 : 0;
         int simulatedFinalistSlot = otherPairStart + random.nextInt(2);
 
         state.fourTeamParticipants = participants;
         state.fourTeamPlayerSlot = playerSlot;
+        state.fourTeamSemifinalWinners = new String[2];
+        state.fourTeamSemifinalWinners[1 - playerSide] = participants[simulatedFinalistSlot];
+        state.eightTeamQuarterWinners = null;
+        state.eightTeamSemifinalWinners = null;
+        state.tournamentChampionName = null;
         state.opponents = new String[] {
                 participants[semifinalOpponentSlot],
-                participants[simulatedFinalistSlot]
+                state.fourTeamSemifinalWinners[1 - playerSide]
         };
     }
 
@@ -550,25 +700,117 @@ public class GameEngine extends GameApp {
             }
         }
 
-        // Lawan perempat final adalah tim yang berada tepat satu pasangan dengan PLAYER.
+        int playerPair = playerSlot / 2;
+        int playerSide = playerSlot < 4 ? 0 : 1;
         int quarterFinalOpponentSlot = playerSlot % 2 == 0 ? playerSlot + 1 : playerSlot - 1;
 
-        // Untuk semifinal, simulasikan pemenang dari pasangan lain pada sisi bracket yang sama.
-        int playerPair = playerSlot / 2;
-        int otherPair = getEightTeamOtherPairOnSameSide(playerPair);
-        int semifinalOpponentSlot = otherPair * 2 + random.nextInt(2);
+        // Simulasikan semua pertandingan yang tidak melibatkan PLAYER sejak awal.
+        // Hasilnya disimpan agar bagan tetap konsisten dan dapat dilanjutkan sampai juara
+        // walaupun PLAYER tersingkir pada ronde mana pun.
+        state.eightTeamQuarterWinners = new String[4];
+        for (int pair = 0; pair < 4; pair++) {
+            if (pair == playerPair) {
+                continue;
+            }
+            int pairStart = pair * 2;
+            state.eightTeamQuarterWinners[pair] = participants[pairStart + random.nextInt(2)];
+        }
 
-        // Untuk final, simulasikan satu finalis dari sisi bracket yang berlawanan.
-        int oppositeSideStart = playerSlot < 4 ? 4 : 0;
-        int finalOpponentSlot = oppositeSideStart + random.nextInt(4);
+        state.eightTeamSemifinalWinners = new String[2];
+        int oppositeSide = 1 - playerSide;
+        int oppositePairStart = oppositeSide == 0 ? 0 : 2;
+        String oppositeQuarterA = state.eightTeamQuarterWinners[oppositePairStart];
+        String oppositeQuarterB = state.eightTeamQuarterWinners[oppositePairStart + 1];
+        state.eightTeamSemifinalWinners[oppositeSide] = random.nextBoolean()
+                ? oppositeQuarterA
+                : oppositeQuarterB;
+
+        int otherPair = getEightTeamOtherPairOnSameSide(playerPair);
+        String semifinalOpponent = state.eightTeamQuarterWinners[otherPair];
+        String finalOpponent = state.eightTeamSemifinalWinners[oppositeSide];
 
         state.eightTeamParticipants = participants;
         state.eightTeamPlayerSlot = playerSlot;
+        state.fourTeamSemifinalWinners = null;
+        state.tournamentChampionName = null;
         state.opponents = new String[] {
                 participants[quarterFinalOpponentSlot],
-                participants[semifinalOpponentSlot],
-                participants[finalOpponentSlot]
+                semifinalOpponent,
+                finalOpponent
         };
+    }
+
+    protected void recordTournamentRoundOutcome(TournamentState state, boolean playerWon) {
+        String playerTeam = state.playerTeamName == null || state.playerTeamName.trim().isEmpty()
+                ? "PLAYER FC"
+                : state.playerTeamName.trim();
+
+        if (state.teamCount <= 4) {
+            if (state.fourTeamSemifinalWinners == null || state.fourTeamSemifinalWinners.length != 2) {
+                state.fourTeamSemifinalWinners = new String[2];
+            }
+            int playerSide = state.fourTeamPlayerSlot < 2 ? 0 : 1;
+
+            if (state.roundIndex == 0) {
+                state.fourTeamSemifinalWinners[playerSide] = playerWon
+                        ? playerTeam
+                        : getTournamentOpponent(state, 0);
+
+                if (!playerWon) {
+                    String finalistA = state.fourTeamSemifinalWinners[0];
+                    String finalistB = state.fourTeamSemifinalWinners[1];
+                    state.tournamentChampionName = random.nextBoolean() ? finalistA : finalistB;
+                }
+            } else {
+                state.tournamentChampionName = playerWon
+                        ? playerTeam
+                        : getTournamentOpponent(state, 1);
+            }
+            return;
+        }
+
+        if (state.eightTeamQuarterWinners == null || state.eightTeamQuarterWinners.length != 4) {
+            state.eightTeamQuarterWinners = new String[4];
+        }
+        if (state.eightTeamSemifinalWinners == null || state.eightTeamSemifinalWinners.length != 2) {
+            state.eightTeamSemifinalWinners = new String[2];
+        }
+
+        int playerPair = state.eightTeamPlayerSlot / 2;
+        int playerSide = state.eightTeamPlayerSlot < 4 ? 0 : 1;
+
+        if (state.roundIndex == 0) {
+            state.eightTeamQuarterWinners[playerPair] = playerWon
+                    ? playerTeam
+                    : getTournamentOpponent(state, 0);
+
+            if (!playerWon) {
+                int sidePairStart = playerSide == 0 ? 0 : 2;
+                String semifinalistA = state.eightTeamQuarterWinners[sidePairStart];
+                String semifinalistB = state.eightTeamQuarterWinners[sidePairStart + 1];
+                state.eightTeamSemifinalWinners[playerSide] = random.nextBoolean()
+                        ? semifinalistA
+                        : semifinalistB;
+
+                String finalistA = state.eightTeamSemifinalWinners[0];
+                String finalistB = state.eightTeamSemifinalWinners[1];
+                state.tournamentChampionName = random.nextBoolean() ? finalistA : finalistB;
+            }
+        } else if (state.roundIndex == 1) {
+            state.eightTeamSemifinalWinners[playerSide] = playerWon
+                    ? playerTeam
+                    : getTournamentOpponent(state, 1);
+
+            if (!playerWon) {
+                String finalistA = state.eightTeamSemifinalWinners[0];
+                String finalistB = state.eightTeamSemifinalWinners[1];
+                state.tournamentChampionName = random.nextBoolean() ? finalistA : finalistB;
+            }
+        } else {
+            state.tournamentChampionName = playerWon
+                    ? playerTeam
+                    : getTournamentOpponent(state, 2);
+        }
     }
 
     protected int getEightTeamQuarterWinnerLabel(int pairIndex) {
@@ -671,6 +913,8 @@ public class GameEngine extends GameApp {
         state.keeperFallArcHeight = 0;
         state.keeperRetroAccumulatorSeconds = 0;
         state.ballRetroAccumulatorSeconds = 0;
+        state.ballBehindKeeper = false;
+        moveBallInFrontOfKeeper(ball, keeper);
         state.retroMotionAccumulatorSeconds = 0;
         state.velocityX = 0;
         state.velocityY = 0;
@@ -725,9 +969,9 @@ public class GameEngine extends GameApp {
     protected Text createScoreBoardLabel(String value, Color color) {
         Text label = new Text(value);
         label.setFill(color);
-        label.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.EXTRA_BOLD, 18)));
-        label.setStroke(Color.rgb(0, 0, 0, 0.45));
-        label.setStrokeWidth(0.8);
+        label.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 21));
+        label.setStroke(Color.rgb(0, 0, 0, 0.98));
+        label.setStrokeWidth(2.5);
         return label;
     }
 
@@ -781,9 +1025,9 @@ public class GameEngine extends GameApp {
     protected Text createMultiplayerPlayerTag(String value, Color color) {
         Text tag = new Text(value);
         tag.setFill(color);
-        tag.setStroke(Color.rgb(0, 0, 0, 0.55));
-        tag.setStrokeWidth(0.8);
-        tag.setFont(loadFont(MENU_FONT_PATH, 24, Font.font("Arial", FontWeight.EXTRA_BOLD, 24)));
+        tag.setStroke(Color.rgb(0, 0, 0, 0.98));
+        tag.setStrokeWidth(2.6);
+        tag.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 26));
         tag.setMouseTransparent(true);
         tag.setOpacity(0);
         return tag;
@@ -854,22 +1098,22 @@ public class GameEngine extends GameApp {
             Text hintText,
             MultiplayerState state
     ) {
-        roleText.setText("PLAYER " + state.shooterPlayer + " PENENDANG  |  PLAYER " + state.keeperPlayer + " KEEPER");
+        roleText.setText("PLAYER " + state.shooterPlayer + " SHOOTER  |  PLAYER " + state.keeperPlayer + " KEEPER");
         scoreText.setText("P1: " + state.playerOneGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
                 + "    P2: " + state.playerTwoGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER);
         shotText.setText("SHOT P1: " + state.playerOneShots + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
                 + "  |  SHOT P2: " + state.playerTwoShots + "/" + MULTIPLAYER_SHOTS_PER_PLAYER);
 
         if (state.phase == MultiplayerPhase.KICKER_AIM) {
-            hintText.setText("PLAYER " + state.shooterPlayer + ": tarik bola lalu lepas.");
+            hintText.setText("PLAYER " + state.shooterPlayer + ": move the aim line, then release. The ball direction stays hidden.");
         } else if (state.phase == MultiplayerPhase.KEEPER_AIM) {
-            hintText.setText("PLAYER " + state.keeperPlayer + ": klik area gawang untuk arah keeper.");
+            hintText.setText("PLAYER " + state.keeperPlayer + ": click the goal area to aim the keeper.");
         } else if (state.phase == MultiplayerPhase.EXECUTING) {
-            hintText.setText("EKSEKUSI: bola dan keeper bergerak.");
+            hintText.setText("ACTION: the ball and keeper are moving.");
         } else if (state.phase == MultiplayerPhase.ROUND_DELAY) {
-            hintText.setText("Ronde selesai. Tunggu ronde berikutnya.");
+            hintText.setText("Round complete. Wait for the next round.");
         } else {
-            hintText.setText("MATCH SELESAI.");
+            hintText.setText("MATCH OVER.");
         }
     }
 
@@ -1047,6 +1291,14 @@ public class GameEngine extends GameApp {
         updateBallRetroRotation(ball, state, motionDeltaSeconds);
         updateBallPerspectiveScale(ball, state);
 
+        // Saat bola sudah masuk area gawang, render bola di belakang keeper.
+        // Ini mencegah bola terlihat menembus badan keeper ketika keduanya bertumpuk.
+        if (!state.ballBehindKeeper
+                && isPointInsidePointBox(root, getCenterX(ball), getCenterY(ball))) {
+            moveBallBehindKeeper(ball, keeper);
+            state.ballBehindKeeper = true;
+        }
+
         double width = root.getWidth();
         double height = root.getHeight();
         boolean outsideScreen = getCenterX(ball) < -80
@@ -1061,7 +1313,7 @@ public class GameEngine extends GameApp {
 
         if (reachedTarget && isBallInsidePointBox(root, ball)) {
             state.phase = MultiplayerPhase.ROUND_DELAY;
-            hintText.setText("GOAL UNTUK PLAYER " + state.shooterPlayer + ". Tunggu ronde berikutnya.");
+            hintText.setText("GOAL FOR PLAYER " + state.shooterPlayer + ". Wait for the next round.");
             triggerGoalText(goalText, state);
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_GOAL);
             return;
@@ -1069,7 +1321,7 @@ public class GameEngine extends GameApp {
 
         if (outsideScreen || reachedTarget) {
             state.phase = MultiplayerPhase.ROUND_DELAY;
-            hintText.setText("BOLA MELESET. Tunggu ronde berikutnya.");
+            hintText.setText("SHOT MISSED. Wait for the next round.");
             queueRoundResolutionAfterKeeperAnimation(state, ROUND_RESULT_MISS);
         }
     }
@@ -1121,18 +1373,32 @@ public class GameEngine extends GameApp {
             ball.setCursor(Cursor.DEFAULT);
             updateMultiplayerTexts(roleText, scoreText, shotText, hintText, state);
 
-            if (state.playerOneGoals > state.playerTwoGoals) {
-                resultTitle.setText("PLAYER 1 MENANG");
-            } else if (state.playerTwoGoals > state.playerOneGoals) {
-                resultTitle.setText("PLAYER 2 MENANG");
-            } else {
-                resultTitle.setText("HASIL SERI");
+            ImageView resultTrophy = null;
+            Object trophyNode = resultBox.getProperties().get("resultTrophy");
+            if (trophyNode instanceof ImageView) {
+                resultTrophy = (ImageView) trophyNode;
             }
+
+            boolean hasWinner = state.playerOneGoals != state.playerTwoGoals;
+            if (state.playerOneGoals > state.playerTwoGoals) {
+                resultTitle.setText("PLAYER 1 VICTORY");
+            } else if (state.playerTwoGoals > state.playerOneGoals) {
+                resultTitle.setText("PLAYER 2 VICTORY");
+            } else {
+                resultTitle.setText("DRAW");
+            }
+
+            if (resultTrophy != null) {
+                resultTrophy.setVisible(hasWinner);
+                resultTrophy.setManaged(hasWinner);
+            }
+            resultTitle.setFill(hasWinner ? Color.rgb(255, 220, 55) : Color.WHITE);
+            resultTitle.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, hasWinner ? 50 : 46));
             resultDetail.setText("PLAYER 1: " + state.playerOneGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
-                    + "\nPLAYER 2: " + state.playerTwoGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER
-                    + "\nSkor lebih banyak menang.");
+                    + "\nPLAYER 2: " + state.playerTwoGoals + "/" + MULTIPLAYER_SHOTS_PER_PLAYER);
             resultOverlay.setVisible(true);
             resultBox.setVisible(true);
+            playTournamentVictoryAnimation(resultBox, resultTitle, hasWinner);
             return;
         }
 
@@ -1248,6 +1514,14 @@ public class GameEngine extends GameApp {
         updateBallRetroRotation(ball, state, motionDeltaSeconds);
         updateBallPerspectiveScale(ball, state);
 
+        // Saat bola memasuki area gawang, pindahkan ke belakang keeper agar
+        // sprite bola tidak terlihat menembus badan karakter.
+        if (!state.ballBehindKeeper
+                && isPointInsidePointBox(root, getCenterX(ball), getCenterY(ball))) {
+            moveBallBehindKeeper(ball, keeper);
+            state.ballBehindKeeper = true;
+        }
+
         double width = root.getWidth();
         double height = root.getHeight();
         boolean outsideScreen = getCenterX(ball) < -80
@@ -1288,6 +1562,12 @@ public class GameEngine extends GameApp {
             Runnable refreshUi,
             Runnable resetRound
     ) {
+        ImageView resultTrophy = null;
+        Object trophyNode = resultBox.getProperties().get("resultTrophy");
+        if (trophyNode instanceof ImageView) {
+            resultTrophy = (ImageView) trophyNode;
+        }
+
         state.ballMoving = false;
         state.dragging = false;
         state.keeperMoving = false;
@@ -1310,38 +1590,75 @@ public class GameEngine extends GameApp {
         if (targetReached) {
             state.roundFinished = true;
             boolean finalRound = state.roundIndex == getTournamentRoundCount(state) - 1;
+            recordTournamentRoundOutcome(state, true);
             state.champion = finalRound;
             state.eliminated = false;
             updateTournamentBracketLabels(bracketLabels, state);
-            setImage(background, TOURNAMENT_BACKGROUND_PATH);
-            resultTitle.setText(finalRound ? "JUARA TURNAMEN" : "RONDE LOLOS");
-            resultDetail.setText(getTournamentRoundName(state) + "\nGol: " + state.roundGoals + "/" + TOURNAMENT_SHOTS_PER_ROUND
-                    + "\nTotal gol: " + state.totalGoals);
-            primaryButton.setText(finalRound ? "ULANGI" : "LANJUT");
-            ball.setCursor(Cursor.DEFAULT);
+
+            // Piala hanya muncul ketika pemain benar-benar memenangkan FINAL.
+            if (resultTrophy != null) {
+                resultTrophy.setVisible(finalRound);
+                resultTrophy.setManaged(finalRound);
+            }
+
             if (finalRound) {
-                startMatchButton.setText("ULANGI");
-                resultOverlay.setVisible(false);
-                resultBox.setVisible(false);
-                setTournamentPlayObjectsVisible(ball, keeper, null, null, false);
-                bracketOverlay.setVisible(true);
+                resultTitle.setFill(Color.rgb(255, 220, 55));
+                resultTitle.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 58));
+                resultTitle.setText("VICTORY");
+                resultDetail.setText("");
+                resultDetail.setVisible(false);
+                resultDetail.setManaged(false);
             } else {
-                resultOverlay.setVisible(true);
-                resultBox.setVisible(true);
+                // Quarter Final dan Semi Final cukup menampilkan data hasil ronde.
+                resultTitle.setFill(Color.WHITE);
+                resultTitle.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 42));
+                resultTitle.setText("RESULT - " + getTournamentRoundName(state));
+                int missedShots = Math.max(0, state.shotsTaken - state.roundGoals);
+                resultDetail.setText(
+                        "TARGET: " + target + " GOALS"
+                                + "\nGOALS: " + state.roundGoals
+                                + "\nMISS: " + missedShots
+                );
+                resultDetail.setVisible(true);
+                resultDetail.setManaged(true);
+            }
+
+            primaryButton.setText("CONTINUE");
+            ball.setCursor(Cursor.DEFAULT);
+            resultOverlay.setVisible(true);
+            resultBox.setVisible(true);
+            playTournamentVictoryAnimation(resultBox, resultTitle, finalRound);
+
+            if (finalRound) {
+                startMatchButton.setText("RESTART");
             }
             return;
         }
 
         if (impossibleToQualify || shotsFinished) {
             state.roundFinished = true;
+            recordTournamentRoundOutcome(state, false);
             state.eliminated = true;
             state.champion = false;
             updateTournamentBracketLabels(bracketLabels, state);
-            setImage(background, TOURNAMENT_BACKGROUND_PATH);
-            resultTitle.setText("ELIMINASI");
-            resultDetail.setText(getTournamentRoundName(state) + "\nTarget: " + target
-                    + " gol\nGol kamu: " + state.roundGoals + "\nTotal gol: " + state.totalGoals);
-            primaryButton.setText("ULANGI");
+
+            // Saat kalah, tampilkan tulisan besar agar langsung terlihat, plus data ronde.
+            if (resultTrophy != null) {
+                resultTrophy.setVisible(false);
+                resultTrophy.setManaged(false);
+            }
+            resultTitle.setFill(Color.rgb(245, 35, 35));
+            resultTitle.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 78));
+            resultTitle.setText("DEFEAT");
+            int missedShots = Math.max(0, state.shotsTaken - state.roundGoals);
+            resultDetail.setText(
+                    "TARGET: " + target + " GOALS"
+                            + "\nGOALS: " + state.roundGoals
+                            + "\nMISS: " + missedShots
+            );
+            resultDetail.setVisible(true);
+            resultDetail.setManaged(true);
+            primaryButton.setText("CONTINUE");
             ball.setCursor(Cursor.DEFAULT);
             resultOverlay.setVisible(true);
             resultBox.setVisible(true);
@@ -1351,13 +1668,12 @@ public class GameEngine extends GameApp {
         resetRound.run();
     }
 
-    protected void updateTournamentTexts(Text roundText, Text targetText, Text shotsText, Text totalText, TournamentState state) {
+    protected void updateTournamentTexts(Text roundText, Text targetText, Text shotsText, TournamentState state) {
         int target = getTournamentTarget(state);
         int shotsLeft = TOURNAMENT_SHOTS_PER_ROUND - state.shotsTaken;
         roundText.setText(getTournamentRoundName(state));
         targetText.setText("TARGET: " + state.roundGoals + "/" + target);
-        shotsText.setText("SISA SHOT: " + shotsLeft);
-        totalText.setText("TOTAL: " + state.totalGoals);
+        shotsText.setText("SHOTS LEFT: " + shotsLeft);
     }
 
     // ==================== 4. LOGIKA ENDLESS ====================
@@ -1593,7 +1909,6 @@ public class GameEngine extends GameApp {
             Text goalText,
             Text titleText,
             Text hintText,
-            Text shortcutText,
             TutorialState state,
             Runnable resetRound,
             Runnable showTutorialCompletePopup,
@@ -1618,12 +1933,11 @@ public class GameEngine extends GameApp {
                     if (result == ROUND_RESULT_GOAL) {
                         state.phase = TutorialPhase.KEEPER_AIM;
                         titleText.setText("TUTORIAL - KEEPER");
-                        shortcutText.setText("PRESS ESC TO EXIT");
                         resetRound.run();
-                        hintText.setText("BAGUS! Sekarang kamu menjadi KEEPER untuk persiapan COOP. Klik lingkaran kuning di gawang.");
+                        hintText.setText("GREAT! Now play as the KEEPER. Click the yellow CATCH HERE marker.");
                     } else {
                         resetRound.run();
-                        hintText.setText("BELUM GOL. LANGKAH 1: Klik dan tahan bola untuk mencoba lagi.");
+                        hintText.setText("NO GOAL YET. Click the yellow-marked ball and aim at the GOAL TARGET.");
                     }
                 } else if (state.phase == TutorialPhase.KEEPER_EXECUTING) {
                     if (result == ROUND_RESULT_SAVED) {
@@ -1631,7 +1945,7 @@ public class GameEngine extends GameApp {
                     } else {
                         state.phase = TutorialPhase.KEEPER_AIM;
                         resetRound.run();
-                        hintText.setText("BELUM BERHASIL MENAHAN BOLA. Klik lingkaran kuning dan coba menjadi keeper lagi.");
+                        hintText.setText("NOT SAVED YET. Click directly on the yellow CATCH HERE marker.");
                     }
                 }
             }
@@ -1958,6 +2272,8 @@ public class GameEngine extends GameApp {
         state.keeperFallArcHeight = 0;
         state.keeperRetroAccumulatorSeconds = 0;
         state.ballRetroAccumulatorSeconds = 0;
+        state.ballBehindKeeper = false;
+        moveBallInFrontOfKeeper(ball, keeper);
         state.retroMotionAccumulatorSeconds = 0;
         state.velocityX = 0;
         state.velocityY = 0;
@@ -1990,7 +2306,7 @@ public class GameEngine extends GameApp {
             Runnable resetRound
     ) {
         state.lives--;
-        livesText.setText("DARAH: " + Math.max(state.lives, 0));
+        livesText.setText("LIVES: " + Math.max(state.lives, 0));
         updateLifeIndicators(lifeIndicators, state.lives);
 
         if (state.lives <= 0) {
@@ -2037,12 +2353,16 @@ public class GameEngine extends GameApp {
                 }
 
                 try {
+                    String entryId = parts[0].trim();
                     String playerName = parts[parts.length - 2].trim();
                     int score = Integer.parseInt(parts[parts.length - 1].trim());
+                    if (entryId.isEmpty()) {
+                        entryId = "legacy-" + entries.size();
+                    }
                     if (playerName.isEmpty()) {
                         playerName = "PLAYER";
                     }
-                    entries.add(new EndlessScoreEntry(playerName, score));
+                    entries.add(new EndlessScoreEntry(entryId, playerName, score));
                 } catch (NumberFormatException ignored) {
                     // Abaikan baris skor yang rusak agar scoreboard tetap dapat dibuka.
                 }
@@ -2052,12 +2372,15 @@ public class GameEngine extends GameApp {
         }
 
         entries.sort((left, right) -> Integer.compare(right.score, left.score));
+        if (entries.size() > MAX_ENDLESS_SCOREBOARD_ENTRIES) {
+            return new ArrayList<>(entries.subList(0, MAX_ENDLESS_SCOREBOARD_ENTRIES));
+        }
         return entries;
     }
 
     protected String formatEndlessScoreboardPage(List<EndlessScoreEntry> entries, int page, int pageSize) {
         if (entries.isEmpty()) {
-            return "Belum ada skor tersimpan.";
+            return "No scores saved yet.";
         }
 
         int safePageSize = Math.max(1, pageSize);
@@ -2080,11 +2403,12 @@ public class GameEngine extends GameApp {
         return builder.toString();
     }
 
-    protected void saveTopScore(String playerName, int score) throws IOException {
+    protected String saveTopScore(String playerName, int score) throws IOException {
         Path scorePath = Path.of(TOP_SCORE_PATH).toAbsolutePath().normalize();
         String cleanName = playerName.replace("\t", " ").replace("\r", " ").replace("\n", " ");
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String line = timestamp + "\t" + cleanName + "\t" + score + System.lineSeparator();
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+        String entryId = timestamp + "-" + Long.toUnsignedString(System.nanoTime());
+        String line = entryId + "\t" + cleanName + "\t" + score + System.lineSeparator();
         Files.writeString(
                 scorePath,
                 line,
@@ -2092,6 +2416,26 @@ public class GameEngine extends GameApp {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.APPEND
         );
+
+        // Simpan hanya 30 skor tertinggi agar scoreboard maksimal berisi 30 pemain.
+        List<EndlessScoreEntry> topEntries = loadEndlessScoreboardEntries();
+        StringBuilder savedScores = new StringBuilder();
+        for (EndlessScoreEntry entry : topEntries) {
+            savedScores.append(entry.entryId)
+                    .append('\t')
+                    .append(entry.playerName.replace("\t", " ").replace("\r", " ").replace("\n", " "))
+                    .append('\t')
+                    .append(entry.score)
+                    .append(System.lineSeparator());
+        }
+        Files.writeString(
+                scorePath,
+                savedScores.toString(),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        );
+        return entryId;
     }
 
     // ==================== 7. KEEPER DAN SENSOR ====================
@@ -2113,7 +2457,7 @@ public class GameEngine extends GameApp {
         state.keeperDiveDirection = ballDirection;
 
         boolean shotInsideGoal = isPointInsidePointBox(root, state.targetX, state.targetY);
-        double readChance = Math.min(KEEPER_MAX_READ_CHANCE, 0.36 + state.score * KEEPER_READ_GROWTH_PER_POINT);
+        double readChance = Math.min(KEEPER_MAX_READ_CHANCE, KEEPER_INITIAL_READ_CHANCE + state.score * KEEPER_READ_GROWTH_PER_POINT);
         if (state.scoredShotsLearned > 0) {
             double learnedDistance = Math.hypot(state.targetX - state.learnedTargetX, state.targetY - state.learnedTargetY);
             if (learnedDistance < root.getWidth() * 0.11) {
@@ -2288,17 +2632,36 @@ public class GameEngine extends GameApp {
         return KEEPER_SIZE * KEEPER_DIVE_SENSOR_Y_OFFSET_RATIO;
     }
 
+    protected double getKeeperSensorRotationDegrees(int direction, int logicalFrameNumber) {
+        if (direction == 0) {
+            return 0;
+        }
+
+        // JavaFX memakai rotasi positif searah jarum jam.
+        // Dive kanan harus miring naik ke kanan (nilai negatif),
+        // sedangkan dive kiri adalah kebalikannya.
+        if (logicalFrameNumber == 3) {
+            return -direction * KEEPER_DIVE_SENSOR_FRAME_3_ROTATION;
+        }
+        if (logicalFrameNumber == 4) {
+            return -direction * KEEPER_DIVE_SENSOR_FRAME_4_ROTATION;
+        }
+        return 0;
+    }
+
     protected KeeperSensorBox getKeeperSensorBoxAt(double keeperCenterX, double keeperCenterY, int direction, int logicalFrameNumber) {
         double sensorWidth = getKeeperSensorWidth(direction, logicalFrameNumber);
         double sensorHeight = getKeeperSensorHeight(direction, logicalFrameNumber);
         double sensorCenterX = keeperCenterX + getKeeperSensorOffsetX(direction);
         double sensorCenterY = keeperCenterY + getKeeperSensorOffsetY(direction);
+        double rotationDegrees = getKeeperSensorRotationDegrees(direction, logicalFrameNumber);
 
         return new KeeperSensorBox(
                 sensorCenterX - sensorWidth / 2,
                 sensorCenterY - sensorHeight / 2,
                 sensorWidth,
-                sensorHeight
+                sensorHeight,
+                rotationDegrees
         );
     }
 
@@ -2311,10 +2674,23 @@ public class GameEngine extends GameApp {
             double pointY
     ) {
         KeeperSensorBox sensorBox = getKeeperSensorBoxAt(keeperCenterX, keeperCenterY, direction, logicalFrameNumber);
-        return pointX >= sensorBox.x
-                && pointX <= sensorBox.x + sensorBox.width
-                && pointY >= sensorBox.y
-                && pointY <= sensorBox.y + sensorBox.height;
+
+        double sensorCenterX = sensorBox.x + sensorBox.width / 2;
+        double sensorCenterY = sensorBox.y + sensorBox.height / 2;
+        double dx = pointX - sensorCenterX;
+        double dy = pointY - sensorCenterY;
+
+        // Putar titik ke arah berlawanan dari rotasi sensor, lalu cek
+        // terhadap kotak lokal. Dengan begitu collision ikut miring
+        // sama seperti sprite keeper, bukan memakai AABB tegak lurus.
+        double radians = Math.toRadians(sensorBox.rotationDegrees);
+        double cos = Math.cos(radians);
+        double sin = Math.sin(radians);
+        double localX = dx * cos + dy * sin;
+        double localY = -dx * sin + dy * cos;
+
+        return Math.abs(localX) <= sensorBox.width / 2
+                && Math.abs(localY) <= sensorBox.height / 2;
     }
 
     protected void updateKeeperSensorOverlay(
@@ -2340,6 +2716,7 @@ public class GameEngine extends GameApp {
         keeperBoxOverlay.setLayoutY(sensorBox.y);
         keeperBoxOverlay.setWidth(sensorBox.width);
         keeperBoxOverlay.setHeight(sensorBox.height);
+        keeperBoxOverlay.setRotate(sensorBox.rotationDegrees);
     }
 
     protected void rememberScoredShot(EndlessState state) {
@@ -2918,12 +3295,14 @@ public class GameEngine extends GameApp {
         protected final double y;
         protected final double width;
         protected final double height;
+        protected final double rotationDegrees;
 
-        protected KeeperSensorBox(double x, double y, double width, double height) {
+        protected KeeperSensorBox(double x, double y, double width, double height, double rotationDegrees) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
+            this.rotationDegrees = rotationDegrees;
         }
     }
 
@@ -2972,10 +3351,12 @@ public class GameEngine extends GameApp {
     }
 
     public static class EndlessScoreEntry {
-        protected final String playerName;
-        protected final int score;
+        public final String entryId;
+        public final String playerName;
+        public final int score;
 
-        protected EndlessScoreEntry(String playerName, int score) {
+        protected EndlessScoreEntry(String entryId, String playerName, int score) {
+            this.entryId = entryId;
             this.playerName = playerName;
             this.score = score;
         }
@@ -3028,6 +3409,7 @@ public class GameEngine extends GameApp {
         public boolean awaitingKeeperAnimationFinish;
         public boolean gameOver;
         public int pendingRoundResult;
+        public boolean ballBehindKeeper;
     }
 
     public static class TournamentState extends EndlessState {
@@ -3042,6 +3424,10 @@ public class GameEngine extends GameApp {
         public int fourTeamPlayerSlot = -1;
         public String[] eightTeamParticipants;
         public int eightTeamPlayerSlot = -1;
+        public String[] fourTeamSemifinalWinners;
+        public String[] eightTeamQuarterWinners;
+        public String[] eightTeamSemifinalWinners;
+        public String tournamentChampionName;
         public boolean setupDone;
         public boolean roundFinished;
         public boolean eliminated;

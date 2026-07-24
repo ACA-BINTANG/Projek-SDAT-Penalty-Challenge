@@ -1,2 +1,30 @@
-2026-07-06 12:16:41	Ade	4
-2026-07-06 14:42:58	gg	5
+seed-001	RAVEN	48
+seed-002	ZENO	46
+seed-003	KAITO	44
+seed-004	NOVA	42
+seed-005	AXEL	40
+seed-006	LUNA	38
+seed-007	RYU	36
+seed-008	BLAZE	34
+seed-009	MIKA	32
+seed-010	RAKA	30
+seed-011	KIRA	28
+seed-012	LEON	27
+seed-013	SORA	25
+seed-014	NERO	24
+seed-015	VINO	22
+seed-016	ARIA	21
+seed-017	DANTE	19
+seed-018	FELIX	18
+seed-019	RIO	16
+seed-020	SKYE	15
+seed-021	KENZO	13
+seed-022	MILO	12
+seed-023	TARA	10
+seed-024	EZRA	9
+seed-025	NIKO	8
+seed-026	ZARA	7
+seed-027	LUCA	6
+seed-028	AKIRA	5
+seed-029	JUNO	3
+seed-030	REX	1

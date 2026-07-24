@@ -8,6 +8,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Scene;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Background;
@@ -54,12 +55,15 @@ public class CoopMode extends GameEngine {
         keeper.setPreserveRatio(true);
         KeeperAnimator keeperAnimator = new KeeperAnimator(keeper);
         keeperAnimator.showIdle();
+        // Actor belum boleh terlihat saat masih memakai posisi default JavaFX (0,0).
+        keeper.setVisible(false);
 
         ImageView ball = createImageView(BALL_IMAGE_PATH);
         ball.setFitWidth(BALL_SIZE);
         ball.setFitHeight(BALL_SIZE);
         ball.setPreserveRatio(true);
         ball.setCursor(Cursor.HAND);
+        ball.setVisible(false);
 
         Line pullLine = new Line();
         pullLine.setStroke(Color.rgb(255, 255, 255, 0.75));
@@ -102,9 +106,11 @@ public class CoopMode extends GameEngine {
 
         Rectangle topHudBackground = createTopHudBackground(root, 126);
 
-        Text roleText = new Text("PLAYER 1 PENENDANG  |  PLAYER 2 KEEPER");
+        Text roleText = new Text("PLAYER 1 SHOOTER  |  PLAYER 2 KEEPER");
         roleText.setFill(Color.WHITE);
-        roleText.setFont(loadFont(MENU_FONT_PATH, 24, Font.font("Arial", FontWeight.BOLD, 24)));
+        roleText.setStroke(Color.rgb(0, 0, 0, 0.95));
+        roleText.setStrokeWidth(2.6);
+        roleText.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 28));
         roleText.layoutXProperty().bind(Bindings.createDoubleBinding(
                 () -> (root.getWidth() - roleText.getLayoutBounds().getWidth()) / 2,
                 root.widthProperty(),
@@ -114,7 +120,9 @@ public class CoopMode extends GameEngine {
 
         Text scoreText = new Text("P1: 0/5    P2: 0/5");
         scoreText.setFill(Color.rgb(255, 235, 120));
-        scoreText.setFont(loadFont(MENU_FONT_PATH, 22, Font.font("Arial", FontWeight.BOLD, 22)));
+        scoreText.setStroke(Color.rgb(0, 0, 0, 0.96));
+        scoreText.setStrokeWidth(2.0);
+        scoreText.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 23));
         scoreText.layoutXProperty().bind(Bindings.createDoubleBinding(
                 () -> (root.getWidth() - scoreText.getLayoutBounds().getWidth()) / 2,
                 root.widthProperty(),
@@ -124,13 +132,17 @@ public class CoopMode extends GameEngine {
 
         Text shotText = new Text("SHOT P1: 0/5  |  SHOT P2: 0/5");
         shotText.setFill(Color.WHITE);
-        shotText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
+        shotText.setStroke(Color.rgb(0, 0, 0, 0.96));
+        shotText.setStrokeWidth(2.0);
+        shotText.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 19));
         shotText.setLayoutX(32);
         shotText.setLayoutY(50);
 
-        Text hintText = new Text("PLAYER 1: tarik bola lalu lepas");
-        hintText.setFill(Color.rgb(255, 255, 255, 0.86));
-        hintText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
+        Text hintText = new Text("PLAYER 1: drag the ball, then release");
+        hintText.setFill(Color.WHITE);
+        hintText.setStroke(Color.rgb(0, 0, 0, 0.98));
+        hintText.setStrokeWidth(2.2);
+        hintText.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, 19));
         hintText.layoutXProperty().bind(Bindings.createDoubleBinding(
                 () -> (root.getWidth() - hintText.getLayoutBounds().getWidth()) / 2,
                 root.widthProperty(),
@@ -144,15 +156,11 @@ public class CoopMode extends GameEngine {
         multiplayerScoreBoard.setLayoutX(32);
         multiplayerScoreBoard.setLayoutY(28);
 
-        Text shortcutText = new Text("ESC = MENU   |   R = ULANGI");
-        shortcutText.setFill(Color.rgb(255, 255, 255, 0.84));
-        shortcutText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
-        shortcutText.layoutXProperty().bind(Bindings.createDoubleBinding(
-                () -> root.getWidth() - shortcutText.getLayoutBounds().getWidth() - 32,
-                root.widthProperty(),
-                shortcutText.layoutBoundsProperty()
-        ));
-        shortcutText.setLayoutY(42);
+        hintText.setVisible(false);
+
+        javafx.scene.control.Button menuButton = createGameplayMenuButton(stage);
+        StackPane.setAlignment(menuButton, Pos.TOP_RIGHT);
+        StackPane.setMargin(menuButton, new Insets(18, 28, 0, 0));
 
         Text playerOneTag = createMultiplayerPlayerTag("PLAYER 1", Color.rgb(235, 55, 55));
         Text playerTwoTag = createMultiplayerPlayerTag("PLAYER 2", Color.rgb(70, 170, 255));
@@ -165,23 +173,41 @@ public class CoopMode extends GameEngine {
         resultOverlay.setMouseTransparent(true);
         resultOverlay.setVisible(false);
 
-        Text resultTitle = new Text("PLAYER 1 MENANG");
-        resultTitle.setFill(Color.WHITE);
+        ImageView resultTrophy = createImageView(TOURNAMENT_TROPHY_PATH);
+        resultTrophy.setFitWidth(235);
+        resultTrophy.setFitHeight(235);
+        resultTrophy.setPreserveRatio(true);
+        resultTrophy.setMouseTransparent(true);
+        DropShadow coopTrophyGlow = new DropShadow();
+        coopTrophyGlow.setColor(Color.rgb(255, 205, 35, 0.98));
+        coopTrophyGlow.setRadius(62);
+        coopTrophyGlow.setSpread(0.48);
+        coopTrophyGlow.setOffsetX(0);
+        coopTrophyGlow.setOffsetY(0);
+        resultTrophy.setEffect(coopTrophyGlow);
+        resultTrophy.setVisible(false);
+        resultTrophy.setManaged(false);
+
+        Text resultTitle = new Text("PLAYER 1 VICTORY");
+        resultTitle.setFill(Color.rgb(255, 220, 55));
+        resultTitle.setStroke(Color.rgb(0, 0, 0, 0.98));
+        resultTitle.setStrokeWidth(2.4);
         resultTitle.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-        resultTitle.setFont(loadFont(MENU_FONT_PATH, 38, Font.font("Arial", FontWeight.EXTRA_BOLD, 38)));
+        resultTitle.setFont(loadFont(MENU_FONT_PATH, 48, Font.font("Arial Black", FontWeight.EXTRA_BOLD, 48)));
 
         Text resultDetail = new Text("P1: 0/5\nP2: 0/5");
         resultDetail.setFill(Color.rgb(255, 235, 120));
         resultDetail.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         resultDetail.setFont(loadFont(MENU_FONT_PATH, 22, Font.font("Arial", FontWeight.BOLD, 22)));
 
-        Text resultShortcutText = new Text("Tekan R untuk ulangi match. Tekan ESC untuk kembali ke menu.");
+        Text resultShortcutText = new Text("Click the MENU button in the top-right to return.");
         resultShortcutText.setFill(Color.rgb(255, 255, 255, 0.86));
         resultShortcutText.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         resultShortcutText.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
 
-        VBox resultBox = new VBox(16, resultTitle, resultDetail, resultShortcutText);
+        VBox resultBox = new VBox(14, resultTrophy, resultTitle, resultDetail, resultShortcutText);
         resultBox.setAlignment(Pos.CENTER);
+        resultBox.getProperties().put("resultTrophy", resultTrophy);
         resultBox.setPadding(new Insets(24));
         resultBox.setBackground(new Background(new BackgroundFill(Color.rgb(0, 0, 0, 0.74), new CornerRadii(10), Insets.EMPTY)));
         resultBox.setMaxWidth(520);
@@ -201,7 +227,6 @@ public class CoopMode extends GameEngine {
                 ball,
                 topHudBackground,
                 multiplayerScoreBoard,
-                shortcutText,
                 playerOneTag,
                 playerTwoTag,
                 goalText,
@@ -210,7 +235,7 @@ public class CoopMode extends GameEngine {
                 resultOverlay,
                 resultBox
         );
-        root.getChildren().addAll(background, playLayer);
+        root.getChildren().addAll(background, playLayer, menuButton);
 
         Scene scene = new Scene(root, 1280, 720);
         setSceneSmooth(stage, scene, this::startGameplayDefaultAudio);
@@ -236,30 +261,16 @@ public class CoopMode extends GameEngine {
             );
             updateMultiplayerScoreBoard(state, playerOneScoreCircles, playerTwoScoreCircles);
             updateMultiplayerPlayerTags(root, ball, keeper, playerOneTag, playerTwoTag, state, 0);
+            if (root.getWidth() > 0 && root.getHeight() > 0) {
+                keeper.setVisible(true);
+                ball.setVisible(true);
+            }
         };
-        Runnable restartMatch = () -> {
-            state.playerOneGoals = 0;
-            state.playerTwoGoals = 0;
-            state.playerOneShots = 0;
-            state.playerTwoShots = 0;
-            state.shooterPlayer = 1;
-            state.keeperPlayer = 2;
-            clearMultiplayerShotResults(state);
-            state.gameOver = false;
-            state.phase = MultiplayerPhase.KICKER_AIM;
-            resultOverlay.setVisible(false);
-            resultBox.setVisible(false);
-            ball.setCursor(Cursor.HAND);
-            resetRound.run();
-        };
-
         // 3. INPUT KEYBOARD
 
         scene.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 showMenu(stage);
-            } else if (event.getCode() == KeyCode.R && state.gameOver) {
-                restartMatch.run();
             }
         });
 
@@ -311,10 +322,13 @@ public class CoopMode extends GameEngine {
                 dy = dy / distance * MAX_PULL_DISTANCE;
             }
 
-            setCenter(ball, state.anchorX + dx, state.anchorY + dy);
-            pullLine.setEndX(getCenterX(ball));
-            pullLine.setEndY(getCenterY(ball));
-            updateTargetMarker(root, ball, targetMarker, state);
+            // Multiplayer memakai tarikan virtual: bola tetap diam agar arah tendangan
+            // tidak terlihat jelas oleh pemain keeper, sedangkan garis tetap mengikuti mouse.
+            setCenter(ball, state.anchorX, state.anchorY);
+            pullLine.setEndX(state.anchorX + dx);
+            pullLine.setEndY(state.anchorY + dy);
+            // Aim marker sengaja disembunyikan di semua mode selain Tutorial.
+            targetMarker.setVisible(false);
             event.consume();
         });
 
@@ -324,12 +338,18 @@ public class CoopMode extends GameEngine {
                 return;
             }
 
+            double virtualPullX = pullLine.getEndX();
+            double virtualPullY = pullLine.getEndY();
             state.dragging = false;
             pullLine.setVisible(false);
             targetMarker.setVisible(false);
+
+            // Hitung tendangan dari ujung garis tanpa membiarkan bola terlihat berpindah.
+            setCenter(ball, virtualPullX, virtualPullY);
             applyKickForce(root, ball, state);
+            setCenter(ball, state.anchorX, state.anchorY);
             if (state.shotSpeed < MIN_BALL_SPEED + 20) {
-                hintText.setText("Tarikan terlalu lemah. PLAYER " + state.shooterPlayer + ": ulangi arah bola.");
+                hintText.setText("The pull is too weak. PLAYER " + state.shooterPlayer + ": aim the shot again.");
                 setCenter(ball, state.anchorX, state.anchorY);
                 event.consume();
                 return;
@@ -350,7 +370,7 @@ public class CoopMode extends GameEngine {
             double selectedX = event.getX();
             double selectedY = event.getY();
             if (!isPointInsidePointBox(root, selectedX, selectedY)) {
-                hintText.setText("PLAYER " + state.keeperPlayer + ": klik area gawang untuk arah keeper.");
+                hintText.setText("PLAYER " + state.keeperPlayer + ": click the goal area to aim the keeper.");
                 return;
             }
 
