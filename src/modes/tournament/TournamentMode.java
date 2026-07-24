@@ -186,6 +186,29 @@ public class TournamentMode extends GameEngine {
         Text setupStatusText = (Text) bracketOverlay.getProperties().get("setupStatusText");
         StackPane bracketHolder = (StackPane) bracketOverlay.getProperties().get("bracketHolder");
 
+        // Validasi nama tim: minimal harus memiliki 3 huruf.
+        final String teamNameInputDefaultStyle = teamNameInput.getStyle();
+        final String teamNameInputErrorStyle = teamNameInputDefaultStyle
+                + ";-fx-border-color: #ff3b30;"
+                + "-fx-border-width: 3;"
+                + "-fx-border-radius: 4;"
+                + "-fx-background-radius: 4;";
+        final boolean[] teamNameValidationActive = {false};
+        java.util.function.Predicate<String> hasMinimumThreeLetters = value -> value != null
+                && value.codePoints().filter(codePoint -> Character.isLetter(codePoint)).limit(3).count() >= 3;
+        Runnable showTeamNameValidationError = () -> {
+            teamNameInput.setStyle(teamNameInputErrorStyle);
+            setupStatusText.setFill(Color.rgb(255, 75, 75));
+            setupStatusText.setText("TEAM NAME MUST HAVE AT LEAST 3 LETTERS");
+            setupStatusText.setVisible(true);
+        };
+        Runnable clearTeamNameValidationError = () -> {
+            teamNameInput.setStyle(teamNameInputDefaultStyle);
+            setupStatusText.setFill(Color.rgb(255, 230, 120));
+            setupStatusText.setText("");
+            setupStatusText.setVisible(false);
+        };
+
         // Saat bagan/pilihan 4 dan 8 tim tampil, HUD gameplay harus benar-benar hilang.
         // Begitu START ditekan dan bracket disembunyikan, HUD otomatis muncul kembali.
         topHudBackground.visibleProperty().bind(bracketOverlay.visibleProperty().not());
@@ -277,9 +300,9 @@ public class TournamentMode extends GameEngine {
                 state.fourTeamParticipants = null;
                 state.fourTeamPlayerSlot = -1;
             }
+            teamNameValidationActive[0] = false;
+            clearTeamNameValidationError.run();
             teamNameInput.setText(state.playerTeamName);
-            setupStatusText.setText("");
-            setupStatusText.setVisible(false);
             startMatchButton.setText("START");
             unlockTournamentSetup.run();
             ball.setCursor(Cursor.DEFAULT);
@@ -295,9 +318,12 @@ public class TournamentMode extends GameEngine {
         root.widthProperty().addListener((observable, oldValue, newValue) -> resetRound.run());
         root.heightProperty().addListener((observable, oldValue, newValue) -> resetRound.run());
         teamNameInput.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (!newValue.trim().isEmpty()) {
-                setupStatusText.setText("");
-                setupStatusText.setVisible(false);
+            if (teamNameValidationActive[0]) {
+                if (hasMinimumThreeLetters.test(newValue)) {
+                    clearTeamNameValidationError.run();
+                } else {
+                    showTeamNameValidationError.run();
+                }
             }
             if (!state.setupDone) {
                 state.playerTeamName = cleanTeamName(newValue);
@@ -354,8 +380,6 @@ public class TournamentMode extends GameEngine {
             state.teamCount = 4;
             prepareFourTeamBracket(state);
             rebuildTournamentBracketBoard(bracketHolder, bracketLabels, state.teamCount);
-            setupStatusText.setText("");
-            setupStatusText.setVisible(false);
             refreshUi.run();
         });
         eightTeamButton.setOnAction(event -> {
@@ -364,8 +388,6 @@ public class TournamentMode extends GameEngine {
             state.fourTeamParticipants = null;
             state.fourTeamPlayerSlot = -1;
             rebuildTournamentBracketBoard(bracketHolder, bracketLabels, state.teamCount);
-            setupStatusText.setText("");
-            setupStatusText.setVisible(false);
             refreshUi.run();
         });
         startMatchButton.setOnAction(event -> {
@@ -375,13 +397,16 @@ public class TournamentMode extends GameEngine {
                 return;
             }
             if (!state.setupDone) {
-                String teamName = teamNameInput.getText().trim();
-                if (teamName.isEmpty()) {
-                    setupStatusText.setText("Team name is required");
-                    setupStatusText.setVisible(true);
+                String teamName = cleanTeamName(teamNameInput.getText());
+                if (!hasMinimumThreeLetters.test(teamName)) {
+                    teamNameValidationActive[0] = true;
+                    showTeamNameValidationError.run();
+                    teamNameInput.requestFocus();
                     return;
                 }
-                state.playerTeamName = cleanTeamName(teamName);
+                teamNameValidationActive[0] = false;
+                clearTeamNameValidationError.run();
+                state.playerTeamName = teamName;
                 if (state.teamCount <= 4) {
                     if (state.fourTeamParticipants == null
                             || state.fourTeamParticipants.length != 4

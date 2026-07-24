@@ -1,6 +1,7 @@
 package modes.tutorial;
 
 import core.GameEngine;
+import core.GameDataStructures.TutorialSnapshot;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -256,7 +257,39 @@ public class TutorialMode extends GameEngine {
             }
         };
 
+        java.util.function.Consumer<TutorialSnapshot> applyTutorialSnapshot = snapshot -> {
+            if (snapshot == null) {
+                return;
+            }
+
+            state.phase = TutorialPhase.valueOf(snapshot.phaseName());
+            state.tutorialComplete = snapshot.tutorialComplete();
+            state.gameOver = snapshot.tutorialComplete();
+            state.ballMoving = false;
+            state.dragging = false;
+            state.roundResolving = false;
+            state.awaitingKeeperAnimationFinish = false;
+            state.pendingRoundResult = ROUND_RESULT_NONE;
+            state.roundResult = ROUND_RESULT_NONE;
+
+            tutorialCompleteOverlay.setVisible(snapshot.tutorialComplete());
+            tutorialCompleteBox.setVisible(snapshot.tutorialComplete());
+            titleText.setText(snapshot.title());
+            hintText.setText(snapshot.hint());
+
+            if (!snapshot.tutorialComplete()) {
+                resetRound.run();
+                titleText.setText(snapshot.title());
+                hintText.setText(snapshot.hint());
+                ball.setCursor(state.phase == TutorialPhase.KICKER ? Cursor.HAND : Cursor.DEFAULT);
+            }
+        };
+
         Runnable showTutorialCompletePopup = () -> {
+            // Simpan tahap keeper ke Stack sebelum tutorial selesai.
+            // Snapshot memakai KEEPER_AIM supaya Undo kembali ke tahap yang bisa dimainkan.
+            state.phase = TutorialPhase.KEEPER_AIM;
+            pushTutorialHistory(state, titleText, hintText);
             state.tutorialComplete = true;
             state.gameOver = true;
             state.phase = TutorialPhase.COMPLETE;
@@ -279,6 +312,16 @@ public class TutorialMode extends GameEngine {
         scene.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
                 showMenu(stage);
+                return;
+            }
+
+            // Stack undo/redo Tutorial: Ctrl+Z untuk undo, Ctrl+Y untuk redo.
+            if (event.isControlDown() && event.getCode() == KeyCode.Z) {
+                applyTutorialSnapshot.accept(undoTutorialHistory(state, titleText, hintText));
+                event.consume();
+            } else if (event.isControlDown() && event.getCode() == KeyCode.Y) {
+                applyTutorialSnapshot.accept(redoTutorialHistory(state, titleText, hintText));
+                event.consume();
             }
         });
 

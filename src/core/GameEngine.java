@@ -33,7 +33,21 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+import java.util.Stack;
+
+import core.GameDataStructures.BotMatchEvent;
+import core.GameDataStructures.BotMatchStage;
+import core.GameDataStructures.BracketNode;
+import core.GameDataStructures.KeeperPathGraph;
+import core.GameDataStructures.KeeperPathNode;
+import core.GameDataStructures.MultiplayerTurn;
+import core.GameDataStructures.PlayerRecord;
+import core.GameDataStructures.TournamentBracketTree;
+import core.GameDataStructures.TutorialSnapshot;
 /**
  * MESIN PERMAINAN BERSAMA.
  *
@@ -48,6 +62,8 @@ import java.util.List;
  * Pemisahan ini membuat file mode tetap fokus pada aturan mode masing-masing.
  */
 public class GameEngine extends GameApp {
+    private static final KeeperPathGraph KEEPER_PATH_GRAPH = new KeeperPathGraph();
+
     // ==================== 1. TAMPILAN DAN BAGAN TOURNAMENT ====================
 
     protected void applyTournamentBlueButtonStyle(Button button) {
@@ -378,100 +394,70 @@ public class GameEngine extends GameApp {
             setBracketLabel(bracketLabels, i, "", false);
         }
 
+        syncTournamentBracketTree(state);
+        if (state.bracketTree == null) {
+            return;
+        }
+
         String playerTeam = state.playerTeamName != null && !state.playerTeamName.isEmpty()
                 ? state.playerTeamName
                 : "PLAYER FC";
 
+        // Bracket dirender melalui traversal Binary Tree, bukan lagi membaca label array secara langsung.
+        for (BracketNode node : state.bracketTree.preOrder()) {
+            if (!isTournamentTreeNodeVisible(state, node.labelIndex())) {
+                continue;
+            }
+            String teamName = node.teamName();
+            setBracketLabel(
+                    bracketLabels,
+                    node.labelIndex(),
+                    teamName,
+                    playerTeam.equals(teamName)
+            );
+        }
+    }
+
+    protected boolean isTournamentTreeNodeVisible(TournamentState state, int labelIndex) {
+        boolean tournamentFinished = state.eliminated || state.champion;
         if (state.teamCount <= 4) {
-            if (state.fourTeamParticipants == null || state.fourTeamParticipants.length != 4) {
-                prepareFourTeamBracket(state);
+            if (labelIndex <= 3) {
+                return true;
             }
+            if (labelIndex <= 5) {
+                return state.roundIndex > 0 || tournamentFinished;
+            }
+            return tournamentFinished;
+        }
 
-            for (int i = 0; i < 4; i++) {
-                setBracketLabel(
-                        bracketLabels,
-                        i,
-                        state.fourTeamParticipants[i],
-                        i == state.fourTeamPlayerSlot
-                );
-            }
+        if (labelIndex <= 7) {
+            return true;
+        }
+        if (labelIndex <= 11) {
+            return state.roundIndex > 0 || tournamentFinished;
+        }
+        if (labelIndex <= 13) {
+            return state.roundIndex > 1 || tournamentFinished;
+        }
+        return tournamentFinished;
+    }
 
-            if ((state.roundIndex > 0 || state.eliminated || state.champion)
-                    && state.fourTeamSemifinalWinners != null) {
-                setBracketLabel(
-                        bracketLabels,
-                        4,
-                        state.fourTeamSemifinalWinners[0],
-                        playerTeam.equals(state.fourTeamSemifinalWinners[0])
-                );
-                setBracketLabel(
-                        bracketLabels,
-                        5,
-                        state.fourTeamSemifinalWinners[1],
-                        playerTeam.equals(state.fourTeamSemifinalWinners[1])
-                );
-            }
-
-            if ((state.eliminated || state.champion) && state.tournamentChampionName != null) {
-                setBracketLabel(
-                        bracketLabels,
-                        6,
-                        state.tournamentChampionName,
-                        playerTeam.equals(state.tournamentChampionName)
-                );
-            }
+    protected void syncTournamentBracketTree(TournamentState state) {
+        if (state == null) {
             return;
         }
-
-        if (state.eightTeamParticipants == null || state.eightTeamParticipants.length != 8) {
-            prepareEightTeamBracket(state);
-        }
-
-        for (int i = 0; i < 8; i++) {
-            setBracketLabel(
-                    bracketLabels,
-                    i,
-                    state.eightTeamParticipants[i],
-                    i == state.eightTeamPlayerSlot
+        if (state.teamCount <= 4) {
+            state.bracketTree = TournamentBracketTree.fourTeams(
+                    state.fourTeamParticipants,
+                    state.fourTeamSemifinalWinners,
+                    state.tournamentChampionName
             );
-        }
-
-        if ((state.roundIndex > 0 || state.eliminated || state.champion)
-                && state.eightTeamQuarterWinners != null) {
-            for (int pair = 0; pair < 4; pair++) {
-                int winnerLabel = getEightTeamQuarterWinnerLabel(pair);
-                String winnerName = state.eightTeamQuarterWinners[pair];
-                setBracketLabel(
-                        bracketLabels,
-                        winnerLabel,
-                        winnerName,
-                        playerTeam.equals(winnerName)
-                );
-            }
-        }
-
-        if ((state.roundIndex > 1 || state.eliminated || state.champion)
-                && state.eightTeamSemifinalWinners != null) {
-            setBracketLabel(
-                    bracketLabels,
-                    12,
-                    state.eightTeamSemifinalWinners[0],
-                    playerTeam.equals(state.eightTeamSemifinalWinners[0])
-            );
-            setBracketLabel(
-                    bracketLabels,
-                    13,
-                    state.eightTeamSemifinalWinners[1],
-                    playerTeam.equals(state.eightTeamSemifinalWinners[1])
-            );
-        }
-
-        if ((state.eliminated || state.champion) && state.tournamentChampionName != null) {
-            setBracketLabel(
-                    bracketLabels,
-                    14,
-                    state.tournamentChampionName,
-                    playerTeam.equals(state.tournamentChampionName)
+        } else {
+            state.bracketTree = TournamentBracketTree.eightTeams(
+                    state.eightTeamParticipants,
+                    state.eightTeamQuarterWinners,
+                    state.eightTeamSemifinalWinners,
+                    state.tournamentChampionName
             );
         }
     }
@@ -652,7 +638,6 @@ public class GameEngine extends GameApp {
                 : state.playerTeamName.trim();
         String[] randomOpponents = createTournamentOpponents(4);
 
-        // Satu dari empat posisi awal khusus PLAYER, tetapi posisinya dipilih secara acak.
         int playerSlot = random.nextInt(4);
         String[] participants = new String[4];
         participants[playerSlot] = playerTeam;
@@ -667,19 +652,30 @@ public class GameEngine extends GameApp {
         int playerSide = playerSlot < 2 ? 0 : 1;
         int semifinalOpponentSlot = playerSlot % 2 == 0 ? playerSlot + 1 : playerSlot - 1;
         int otherPairStart = playerSide == 0 ? 2 : 0;
-        int simulatedFinalistSlot = otherPairStart + random.nextInt(2);
 
+        state.botMatchQueue.clear();
         state.fourTeamParticipants = participants;
         state.fourTeamPlayerSlot = playerSlot;
         state.fourTeamSemifinalWinners = new String[2];
-        state.fourTeamSemifinalWinners[1 - playerSide] = participants[simulatedFinalistSlot];
         state.eightTeamQuarterWinners = null;
         state.eightTeamSemifinalWinners = null;
         state.tournamentChampionName = null;
+
+        // Pertandingan bot dimasukkan ke Queue lalu diproses sesuai urutan FIFO.
+        enqueueTournamentBotMatch(
+                state,
+                BotMatchStage.FOUR_TEAM_SEMIFINAL,
+                1 - playerSide,
+                participants[otherPairStart],
+                participants[otherPairStart + 1]
+        );
+        processTournamentBotQueue(state);
+
         state.opponents = new String[] {
                 participants[semifinalOpponentSlot],
                 state.fourTeamSemifinalWinners[1 - playerSide]
         };
+        syncTournamentBracketTree(state);
     }
 
     protected void prepareEightTeamBracket(TournamentState state) {
@@ -688,7 +684,6 @@ public class GameEngine extends GameApp {
                 : state.playerTeamName.trim();
         String[] randomOpponents = createTournamentOpponents(8);
 
-        // Satu dari delapan slot dipilih secara acak untuk PLAYER.
         int playerSlot = random.nextInt(8);
         String[] participants = new String[8];
         participants[playerSlot] = playerTeam;
@@ -704,40 +699,49 @@ public class GameEngine extends GameApp {
         int playerSide = playerSlot < 4 ? 0 : 1;
         int quarterFinalOpponentSlot = playerSlot % 2 == 0 ? playerSlot + 1 : playerSlot - 1;
 
-        // Simulasikan semua pertandingan yang tidak melibatkan PLAYER sejak awal.
-        // Hasilnya disimpan agar bagan tetap konsisten dan dapat dilanjutkan sampai juara
-        // walaupun PLAYER tersingkir pada ronde mana pun.
+        state.botMatchQueue.clear();
+        state.eightTeamParticipants = participants;
+        state.eightTeamPlayerSlot = playerSlot;
+        state.fourTeamSemifinalWinners = null;
+        state.tournamentChampionName = null;
         state.eightTeamQuarterWinners = new String[4];
         for (int pair = 0; pair < 4; pair++) {
             if (pair == playerPair) {
                 continue;
             }
             int pairStart = pair * 2;
-            state.eightTeamQuarterWinners[pair] = participants[pairStart + random.nextInt(2)];
+            enqueueTournamentBotMatch(
+                    state,
+                    BotMatchStage.EIGHT_TEAM_QUARTER_FINAL,
+                    pair,
+                    participants[pairStart],
+                    participants[pairStart + 1]
+            );
         }
+        processTournamentBotQueue(state);
 
         state.eightTeamSemifinalWinners = new String[2];
         int oppositeSide = 1 - playerSide;
         int oppositePairStart = oppositeSide == 0 ? 0 : 2;
-        String oppositeQuarterA = state.eightTeamQuarterWinners[oppositePairStart];
-        String oppositeQuarterB = state.eightTeamQuarterWinners[oppositePairStart + 1];
-        state.eightTeamSemifinalWinners[oppositeSide] = random.nextBoolean()
-                ? oppositeQuarterA
-                : oppositeQuarterB;
+        enqueueTournamentBotMatch(
+                state,
+                BotMatchStage.EIGHT_TEAM_SEMIFINAL,
+                oppositeSide,
+                state.eightTeamQuarterWinners[oppositePairStart],
+                state.eightTeamQuarterWinners[oppositePairStart + 1]
+        );
+        processTournamentBotQueue(state);
 
         int otherPair = getEightTeamOtherPairOnSameSide(playerPair);
         String semifinalOpponent = state.eightTeamQuarterWinners[otherPair];
         String finalOpponent = state.eightTeamSemifinalWinners[oppositeSide];
 
-        state.eightTeamParticipants = participants;
-        state.eightTeamPlayerSlot = playerSlot;
-        state.fourTeamSemifinalWinners = null;
-        state.tournamentChampionName = null;
         state.opponents = new String[] {
                 participants[quarterFinalOpponentSlot],
                 semifinalOpponent,
                 finalOpponent
         };
+        syncTournamentBracketTree(state);
     }
 
     protected void recordTournamentRoundOutcome(TournamentState state, boolean playerWon) {
@@ -757,15 +761,21 @@ public class GameEngine extends GameApp {
                         : getTournamentOpponent(state, 0);
 
                 if (!playerWon) {
-                    String finalistA = state.fourTeamSemifinalWinners[0];
-                    String finalistB = state.fourTeamSemifinalWinners[1];
-                    state.tournamentChampionName = random.nextBoolean() ? finalistA : finalistB;
+                    enqueueTournamentBotMatch(
+                            state,
+                            BotMatchStage.FINAL,
+                            0,
+                            state.fourTeamSemifinalWinners[0],
+                            state.fourTeamSemifinalWinners[1]
+                    );
+                    processTournamentBotQueue(state);
                 }
             } else {
                 state.tournamentChampionName = playerWon
                         ? playerTeam
                         : getTournamentOpponent(state, 1);
             }
+            syncTournamentBracketTree(state);
             return;
         }
 
@@ -786,15 +796,23 @@ public class GameEngine extends GameApp {
 
             if (!playerWon) {
                 int sidePairStart = playerSide == 0 ? 0 : 2;
-                String semifinalistA = state.eightTeamQuarterWinners[sidePairStart];
-                String semifinalistB = state.eightTeamQuarterWinners[sidePairStart + 1];
-                state.eightTeamSemifinalWinners[playerSide] = random.nextBoolean()
-                        ? semifinalistA
-                        : semifinalistB;
+                enqueueTournamentBotMatch(
+                        state,
+                        BotMatchStage.EIGHT_TEAM_SEMIFINAL,
+                        playerSide,
+                        state.eightTeamQuarterWinners[sidePairStart],
+                        state.eightTeamQuarterWinners[sidePairStart + 1]
+                );
+                processTournamentBotQueue(state);
 
-                String finalistA = state.eightTeamSemifinalWinners[0];
-                String finalistB = state.eightTeamSemifinalWinners[1];
-                state.tournamentChampionName = random.nextBoolean() ? finalistA : finalistB;
+                enqueueTournamentBotMatch(
+                        state,
+                        BotMatchStage.FINAL,
+                        0,
+                        state.eightTeamSemifinalWinners[0],
+                        state.eightTeamSemifinalWinners[1]
+                );
+                processTournamentBotQueue(state);
             }
         } else if (state.roundIndex == 1) {
             state.eightTeamSemifinalWinners[playerSide] = playerWon
@@ -802,15 +820,52 @@ public class GameEngine extends GameApp {
                     : getTournamentOpponent(state, 1);
 
             if (!playerWon) {
-                String finalistA = state.eightTeamSemifinalWinners[0];
-                String finalistB = state.eightTeamSemifinalWinners[1];
-                state.tournamentChampionName = random.nextBoolean() ? finalistA : finalistB;
+                enqueueTournamentBotMatch(
+                        state,
+                        BotMatchStage.FINAL,
+                        0,
+                        state.eightTeamSemifinalWinners[0],
+                        state.eightTeamSemifinalWinners[1]
+                );
+                processTournamentBotQueue(state);
             }
         } else {
             state.tournamentChampionName = playerWon
                     ? playerTeam
                     : getTournamentOpponent(state, 2);
         }
+        syncTournamentBracketTree(state);
+    }
+
+    protected void enqueueTournamentBotMatch(
+            TournamentState state,
+            BotMatchStage stage,
+            int destinationIndex,
+            String teamA,
+            String teamB
+    ) {
+        if (state == null || teamA == null || teamB == null) {
+            return;
+        }
+        state.botMatchQueue.offer(new BotMatchEvent(stage, destinationIndex, teamA, teamB));
+    }
+
+    protected void processTournamentBotQueue(TournamentState state) {
+        while (state != null && !state.botMatchQueue.isEmpty()) {
+            BotMatchEvent event = state.botMatchQueue.poll();
+            String winner = random.nextBoolean() ? event.teamA() : event.teamB();
+
+            switch (event.stage()) {
+                case FOUR_TEAM_SEMIFINAL ->
+                        state.fourTeamSemifinalWinners[event.destinationIndex()] = winner;
+                case EIGHT_TEAM_QUARTER_FINAL ->
+                        state.eightTeamQuarterWinners[event.destinationIndex()] = winner;
+                case EIGHT_TEAM_SEMIFINAL ->
+                        state.eightTeamSemifinalWinners[event.destinationIndex()] = winner;
+                case FINAL -> state.tournamentChampionName = winner;
+            }
+        }
+        syncTournamentBracketTree(state);
     }
 
     protected int getEightTeamQuarterWinnerLabel(int pairIndex) {
@@ -873,6 +928,25 @@ public class GameEngine extends GameApp {
 
     // ==================== 2. LOGIKA CO-OP / MULTIPLAYER ====================
 
+    protected void initializeMultiplayerTurnOrder(MultiplayerState state) {
+        if (state.turnOrder.isEmpty()) {
+            state.turnOrder.add(new MultiplayerTurn(1, 2));
+            state.turnOrder.add(new MultiplayerTurn(2, 1));
+        }
+        MultiplayerTurn currentTurn = state.turnOrder.getFirst();
+        state.shooterPlayer = currentTurn.shooterPlayer();
+        state.keeperPlayer = currentTurn.keeperPlayer();
+    }
+
+    protected void rotateMultiplayerTurnOrder(MultiplayerState state) {
+        initializeMultiplayerTurnOrder(state);
+        MultiplayerTurn completedTurn = state.turnOrder.removeFirst();
+        state.turnOrder.addLast(completedTurn);
+        MultiplayerTurn nextTurn = state.turnOrder.getFirst();
+        state.shooterPlayer = nextTurn.shooterPlayer();
+        state.keeperPlayer = nextTurn.keeperPlayer();
+    }
+
     protected void resetMultiplayerRound(
             StackPane root,
             ImageView ball,
@@ -891,6 +965,7 @@ public class GameEngine extends GameApp {
             return;
         }
 
+        initializeMultiplayerTurnOrder(state);
         state.ballMoving = false;
         state.dragging = false;
         state.keeperMoving = false;
@@ -1402,13 +1477,8 @@ public class GameEngine extends GameApp {
             return;
         }
 
-        if (state.shooterPlayer == 1) {
-            state.shooterPlayer = 2;
-            state.keeperPlayer = 1;
-        } else {
-            state.shooterPlayer = 1;
-            state.keeperPlayer = 2;
-        }
+        // Rotasi giliran menggunakan LinkedList: elemen pertama dipindah ke belakang.
+        rotateMultiplayerTurnOrder(state);
         state.phase = MultiplayerPhase.KICKER_AIM;
         state.playerTagFadeTimerSeconds = 0;
         resetRound.run();
@@ -1900,6 +1970,42 @@ public class GameEngine extends GameApp {
         );
     }
 
+    protected void pushTutorialHistory(TutorialState state, Text titleText, Text hintText) {
+        state.undoHistory.push(new TutorialSnapshot(
+                state.phase.name(),
+                state.tutorialComplete,
+                titleText.getText(),
+                hintText.getText()
+        ));
+        state.redoHistory.clear();
+    }
+
+    protected TutorialSnapshot undoTutorialHistory(TutorialState state, Text titleText, Text hintText) {
+        if (state.undoHistory.isEmpty()) {
+            return null;
+        }
+        state.redoHistory.push(new TutorialSnapshot(
+                state.phase.name(),
+                state.tutorialComplete,
+                titleText.getText(),
+                hintText.getText()
+        ));
+        return state.undoHistory.pop();
+    }
+
+    protected TutorialSnapshot redoTutorialHistory(TutorialState state, Text titleText, Text hintText) {
+        if (state.redoHistory.isEmpty()) {
+            return null;
+        }
+        state.undoHistory.push(new TutorialSnapshot(
+                state.phase.name(),
+                state.tutorialComplete,
+                titleText.getText(),
+                hintText.getText()
+        ));
+        return state.redoHistory.pop();
+    }
+
     protected void updateTutorial(
             StackPane root,
             ImageView ball,
@@ -1931,6 +2037,8 @@ public class GameEngine extends GameApp {
 
                 if (state.phase == TutorialPhase.KICKER) {
                     if (result == ROUND_RESULT_GOAL) {
+                        // Simpan state lama ke Stack agar Ctrl+Z dapat kembali ke tahap penendang.
+                        pushTutorialHistory(state, titleText, hintText);
                         state.phase = TutorialPhase.KEEPER_AIM;
                         titleText.setText("TUTORIAL - KEEPER");
                         resetRound.run();
@@ -2378,6 +2486,46 @@ public class GameEngine extends GameApp {
         return entries;
     }
 
+    protected List<PlayerRecord> loadPlayerRecords() {
+        List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
+        List<PlayerRecord> players = new ArrayList<>();
+        for (EndlessScoreEntry entry : entries) {
+            int level = Math.max(1, entry.score / 5 + 1);
+            String status;
+            if (entry.score >= 20) {
+                status = "ELITE";
+            } else if (entry.score >= 10) {
+                status = "PRO";
+            } else {
+                status = "ROOKIE";
+            }
+            players.add(new PlayerRecord(
+                    entry.entryId,
+                    entry.playerName,
+                    entry.score,
+                    level,
+                    status
+            ));
+        }
+        return players;
+    }
+
+    protected HashMap<String, PlayerRecord> indexPlayersById(List<PlayerRecord> players) {
+        HashMap<String, PlayerRecord> playerById = new HashMap<>();
+        for (PlayerRecord player : players) {
+            playerById.put(player.id(), player);
+        }
+        return playerById;
+    }
+
+    protected HashMap<String, Integer> indexPlayerRanksById(List<PlayerRecord> players) {
+        HashMap<String, Integer> rankById = new HashMap<>();
+        for (int i = 0; i < players.size(); i++) {
+            rankById.put(players.get(i).id(), i);
+        }
+        return rankById;
+    }
+
     protected String formatEndlessScoreboardPage(List<EndlessScoreEntry> entries, int page, int pageSize) {
         if (entries.isEmpty()) {
             return "No scores saved yet.";
@@ -2732,6 +2880,61 @@ public class GameEngine extends GameApp {
 
     // ==================== 8. GERAK KEEPER ====================
 
+    protected KeeperPathNode resolveKeeperPathNode(StackPane root, double x) {
+        double minX = getKeeperMovementMinX(root);
+        double maxX = getKeeperMovementMaxX(root);
+        double ratio = clamp((x - minX) / Math.max(1, maxX - minX), 0, 1);
+        if (ratio < 0.18) {
+            return KeeperPathNode.FAR_LEFT;
+        }
+        if (ratio < 0.40) {
+            return KeeperPathNode.LEFT;
+        }
+        if (ratio < 0.60) {
+            return KeeperPathNode.CENTER;
+        }
+        if (ratio < 0.82) {
+            return KeeperPathNode.RIGHT;
+        }
+        return KeeperPathNode.FAR_RIGHT;
+    }
+
+    protected double getKeeperPathNodeX(StackPane root, KeeperPathNode node) {
+        double minX = getKeeperMovementMinX(root);
+        double maxX = getKeeperMovementMaxX(root);
+        double ratio = switch (node) {
+            case FAR_LEFT -> 0.0;
+            case LEFT -> 0.25;
+            case CENTER -> 0.5;
+            case RIGHT -> 0.75;
+            case FAR_RIGHT -> 1.0;
+        };
+        return lerp(minX, maxX, ratio);
+    }
+
+    protected double interpolateKeeperGraphPathX(
+            StackPane root,
+            EndlessState state,
+            double progress
+    ) {
+        if (state.keeperGraphPath == null || state.keeperGraphPath.size() < 2) {
+            return lerp(state.keeperMoveStartX, state.keeperTargetX, progress);
+        }
+
+        int segmentCount = state.keeperGraphPath.size() - 1;
+        double scaledProgress = clamp(progress, 0, 1) * segmentCount;
+        int segmentIndex = Math.min(segmentCount - 1, (int) Math.floor(scaledProgress));
+        double localProgress = scaledProgress - segmentIndex;
+
+        double startX = segmentIndex == 0
+                ? state.keeperMoveStartX
+                : getKeeperPathNodeX(root, state.keeperGraphPath.get(segmentIndex));
+        double endX = segmentIndex == segmentCount - 1
+                ? state.keeperTargetX
+                : getKeeperPathNodeX(root, state.keeperGraphPath.get(segmentIndex + 1));
+        return lerp(startX, endX, easeInOutSine(localProgress));
+    }
+
     protected void startKeeperJumpMovement(StackPane root, ImageView keeper, EndlessState state, double speed) {
         state.keeperMoving = state.keeperJumping;
         if (!state.keeperMoving) {
@@ -2749,6 +2952,11 @@ public class GameEngine extends GameApp {
         state.keeperMoveStartY = startY;
         state.keeperMoveElapsedSeconds = 0;
         state.keeperRetroAccumulatorSeconds = 0;
+
+        // Graph + BFS menentukan urutan zona yang dilewati keeper bot.
+        KeeperPathNode startNode = resolveKeeperPathNode(root, startX);
+        KeeperPathNode targetNode = resolveKeeperPathNode(root, state.keeperTargetX);
+        state.keeperGraphPath = new ArrayList<>(KEEPER_PATH_GRAPH.shortestPath(startNode, targetNode));
 
         double moveDistance = Math.hypot(state.keeperTargetX - startX, state.keeperTargetY - startY);
         if (state.keeperVerticalJump || state.keeperDiveDirection == 0) {
@@ -2779,12 +2987,13 @@ public class GameEngine extends GameApp {
         double x;
         double y;
         if (state.keeperVerticalJump || state.keeperDiveDirection == 0) {
-            x = lerp(state.keeperMoveStartX, state.keeperTargetX, easeOutQuad(progress));
-            y = lerp(state.keeperMoveStartY, state.keeperTargetY, easeOutQuad(progress));
+            double moveProgress = easeOutQuad(progress);
+            x = interpolateKeeperGraphPathX(root, state, moveProgress);
+            y = lerp(state.keeperMoveStartY, state.keeperTargetY, moveProgress);
         } else {
             double moveProgress = easeInOutSine(progress);
             double baseY = lerp(state.keeperMoveStartY, state.keeperTargetY, moveProgress);
-            x = lerp(state.keeperMoveStartX, state.keeperTargetX, moveProgress);
+            x = interpolateKeeperGraphPathX(root, state, moveProgress);
             y = baseY - state.keeperMoveArcHeight * Math.sin(Math.PI * progress);
         }
 
@@ -3335,6 +3544,8 @@ public class GameEngine extends GameApp {
     public static class TutorialState extends EndlessState {
         public boolean tutorialComplete;
         public TutorialPhase phase = TutorialPhase.KICKER;
+        public final Stack<TutorialSnapshot> undoHistory = new Stack<>();
+        public final Stack<TutorialSnapshot> redoHistory = new Stack<>();
     }
 
     public static class MultiplayerState extends EndlessState {
@@ -3344,6 +3555,7 @@ public class GameEngine extends GameApp {
         public int playerTwoShots;
         public int shooterPlayer = 1;
         public int keeperPlayer = 2;
+        public final LinkedList<MultiplayerTurn> turnOrder = new LinkedList<>();
         public int[] playerOneShotResults = new int[MULTIPLAYER_SHOTS_PER_PLAYER];
         public int[] playerTwoShotResults = new int[MULTIPLAYER_SHOTS_PER_PLAYER];
         public MultiplayerPhase phase = MultiplayerPhase.KICKER_AIM;
@@ -3410,6 +3622,7 @@ public class GameEngine extends GameApp {
         public boolean gameOver;
         public int pendingRoundResult;
         public boolean ballBehindKeeper;
+        public List<KeeperPathNode> keeperGraphPath = new ArrayList<>();
     }
 
     public static class TournamentState extends EndlessState {
@@ -3432,6 +3645,8 @@ public class GameEngine extends GameApp {
         public boolean roundFinished;
         public boolean eliminated;
         public boolean champion;
+        public final Queue<BotMatchEvent> botMatchQueue = new LinkedList<>();
+        public TournamentBracketTree bracketTree;
     }
 
 }

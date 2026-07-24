@@ -1,6 +1,7 @@
 package modes.endless;
 
 import core.GameEngine;
+import core.GameDataStructures.PlayerRecord;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -29,6 +30,7 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 /**
  * MODE ENDLESS
@@ -251,7 +253,7 @@ public class EndlessMode extends GameEngine {
         final int[] scoreboardPage = {0};
         final String[] highlightedScoreId = {null};
         Runnable refreshScoreboard = () -> {
-            List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
+            List<PlayerRecord> entries = loadPlayerRecords();
             int totalPages = Math.max(1, (entries.size() + scoreboardPageSize - 1) / scoreboardPageSize);
             if (scoreboardPage[0] >= totalPages) {
                 scoreboardPage[0] = totalPages - 1;
@@ -278,16 +280,16 @@ public class EndlessMode extends GameEngine {
                 int startIndex = scoreboardPage[0] * scoreboardPageSize;
                 int endIndex = Math.min(startIndex + scoreboardPageSize, entries.size());
                 for (int i = startIndex; i < endIndex; i++) {
-                    EndlessScoreEntry entry = entries.get(i);
-                    String safeName = entry.playerName.length() > 16
-                            ? entry.playerName.substring(0, 16)
-                            : entry.playerName;
+                    PlayerRecord entry = entries.get(i);
+                    String safeName = entry.name().length() > 16
+                            ? entry.name().substring(0, 16)
+                            : entry.name();
                     boolean highlighted = highlightedScoreId[0] != null
-                            && highlightedScoreId[0].equals(entry.entryId);
+                            && highlightedScoreId[0].equals(entry.id());
 
                     Label rankLabel = new Label(String.format("%02d", i + 1));
                     Label playerLabel = new Label(safeName.toUpperCase());
-                    Label pointsLabel = new Label(String.valueOf(entry.score));
+                    Label pointsLabel = new Label(String.valueOf(entry.score()));
                     Label[] rowLabels = {rankLabel, playerLabel, pointsLabel};
                     for (Label label : rowLabels) {
                         label.setTextFill(highlighted ? Color.BLACK : Color.WHITE);
@@ -345,7 +347,7 @@ public class EndlessMode extends GameEngine {
         });
         nextScorePageButton.setOnAction(event -> {
             int totalPages = Math.max(1,
-                    (loadEndlessScoreboardEntries().size() + scoreboardPageSize - 1) / scoreboardPageSize);
+                    (loadPlayerRecords().size() + scoreboardPageSize - 1) / scoreboardPageSize);
             if (scoreboardPage[0] < totalPages - 1) {
                 scoreboardPage[0]++;
                 refreshScoreboard.run();
@@ -393,11 +395,13 @@ public class EndlessMode extends GameEngine {
             if (show) {
                 scoreboardPage[0] = 0;
                 if (highlightedScoreId[0] != null) {
-                    List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
-                    for (int i = 0; i < entries.size(); i++) {
-                        if (highlightedScoreId[0].equals(entries.get(i).entryId)) {
-                            scoreboardPage[0] = i / scoreboardPageSize;
-                            break;
+                    List<PlayerRecord> entries = loadPlayerRecords();
+                    HashMap<String, PlayerRecord> playerById = indexPlayersById(entries);
+                    HashMap<String, Integer> rankById = indexPlayerRanksById(entries);
+                    if (playerById.containsKey(highlightedScoreId[0])) {
+                        Integer rankIndex = rankById.get(highlightedScoreId[0]);
+                        if (rankIndex != null) {
+                            scoreboardPage[0] = rankIndex / scoreboardPageSize;
                         }
                     }
                 }
@@ -438,9 +442,20 @@ public class EndlessMode extends GameEngine {
         nameLabel.setFont(loadFont(MENU_FONT_PATH, 16, Font.font("Arial", FontWeight.BOLD, 16)));
 
         TextField nameInput = new TextField();
-        nameInput.setPromptText("Enter name");
+        nameInput.setPromptText("Enter name (minimum 3 letters)");
         nameInput.setMaxWidth(260);
         nameInput.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+
+        // Validasi nama scoreboard Endless: minimal harus memiliki 3 huruf.
+        final String nameInputDefaultStyle = nameInput.getStyle();
+        final String nameInputErrorStyle = nameInputDefaultStyle
+                + ";-fx-border-color: #ff3b30;"
+                + "-fx-border-width: 3;"
+                + "-fx-border-radius: 4;"
+                + "-fx-background-radius: 4;";
+        final boolean[] nameValidationActive = {false};
+        java.util.function.Predicate<String> hasMinimumThreeLetters = value -> value != null
+                && value.codePoints().filter(codePoint -> Character.isLetter(codePoint)).limit(3).count() >= 3;
 
         Button saveButton = new Button("SAVE");
         Button cancelButton = new Button("CANCEL");
@@ -455,6 +470,27 @@ public class EndlessMode extends GameEngine {
         Text saveStatusText = new Text("");
         saveStatusText.setFill(Color.rgb(255, 230, 120));
         saveStatusText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+
+        Runnable showNameValidationError = () -> {
+            nameInput.setStyle(nameInputErrorStyle);
+            saveStatusText.setFill(Color.rgb(255, 75, 75));
+            saveStatusText.setText("NAME MUST HAVE AT LEAST 3 LETTERS");
+        };
+        Runnable clearNameValidationError = () -> {
+            nameInput.setStyle(nameInputDefaultStyle);
+            saveStatusText.setFill(Color.rgb(255, 230, 120));
+            saveStatusText.setText("");
+        };
+        nameInput.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (!nameValidationActive[0]) {
+                return;
+            }
+            if (hasMinimumThreeLetters.test(newValue)) {
+                clearNameValidationError.run();
+            } else {
+                showNameValidationError.run();
+            }
+        });
 
         VBox saveScoreBox = new VBox(12, finalScoreText, nameLabel, nameInput, scoreButtonBox, saveStatusText);
         saveScoreBox.setAlignment(Pos.CENTER);
@@ -522,8 +558,9 @@ public class EndlessMode extends GameEngine {
             saveScoreBox.setVisible(false);
             scoreboardPanel.setVisible(false);
             scoreboardButton.setText("SCOREBOARD");
+            nameValidationActive[0] = false;
+            clearNameValidationError.run();
             nameInput.clear();
-            saveStatusText.setText("");
             state.gameOver = false;
             ball.setCursor(Cursor.HAND);
             resetRound.run();
@@ -535,19 +572,25 @@ public class EndlessMode extends GameEngine {
 
         saveButton.setOnAction(event -> {
             String playerName = nameInput.getText().trim();
-            if (playerName.isEmpty()) {
-                saveStatusText.setText("Name is required");
+            if (!hasMinimumThreeLetters.test(playerName)) {
+                nameValidationActive[0] = true;
+                showNameValidationError.run();
+                nameInput.requestFocus();
                 return;
             }
 
+            nameValidationActive[0] = false;
+            clearNameValidationError.run();
             try {
                 highlightedScoreId[0] = saveTopScore(playerName, state.score);
-                List<EndlessScoreEntry> entries = loadEndlessScoreboardEntries();
+                List<PlayerRecord> entries = loadPlayerRecords();
+                HashMap<String, PlayerRecord> playerById = indexPlayersById(entries);
+                HashMap<String, Integer> rankById = indexPlayerRanksById(entries);
                 scoreboardPage[0] = 0;
-                for (int i = 0; i < entries.size(); i++) {
-                    if (highlightedScoreId[0].equals(entries.get(i).entryId)) {
-                        scoreboardPage[0] = i / scoreboardPageSize;
-                        break;
+                if (playerById.containsKey(highlightedScoreId[0])) {
+                    Integer rankIndex = rankById.get(highlightedScoreId[0]);
+                    if (rankIndex != null) {
+                        scoreboardPage[0] = rankIndex / scoreboardPageSize;
                     }
                 }
 
