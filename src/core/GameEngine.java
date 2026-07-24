@@ -1673,7 +1673,7 @@ public class GameEngine extends GameApp {
         int shotsLeft = TOURNAMENT_SHOTS_PER_ROUND - state.shotsTaken;
         roundText.setText(getTournamentRoundName(state));
         targetText.setText("TARGET: " + state.roundGoals + "/" + target);
-        shotsText.setText("SHOTS LEFT: " + shotsLeft);
+        shotsText.setText("LIVES: " + shotsLeft);
     }
 
     // ==================== 4. LOGIKA ENDLESS ====================
@@ -1934,10 +1934,10 @@ public class GameEngine extends GameApp {
                         state.phase = TutorialPhase.KEEPER_AIM;
                         titleText.setText("TUTORIAL - KEEPER");
                         resetRound.run();
-                        hintText.setText("GREAT! Now play as the KEEPER. Click the yellow CATCH HERE marker.");
+                        hintText.setText("GREAT! Now play as the KEEPER. Click the yellow circle inside the goal to choose the catch position.");
                     } else {
                         resetRound.run();
-                        hintText.setText("NO GOAL YET. Click the yellow-marked ball and aim at the GOAL TARGET.");
+                        hintText.setText("NO GOAL YET. Hold the ball inside the yellow circle and aim at the yellow circle inside the goal.");
                     }
                 } else if (state.phase == TutorialPhase.KEEPER_EXECUTING) {
                     if (result == ROUND_RESULT_SAVED) {
@@ -1945,7 +1945,7 @@ public class GameEngine extends GameApp {
                     } else {
                         state.phase = TutorialPhase.KEEPER_AIM;
                         resetRound.run();
-                        hintText.setText("NOT SAVED YET. Click directly on the yellow CATCH HERE marker.");
+                        hintText.setText("NOT SAVED YET. Click directly inside the yellow circle in the goal.");
                     }
                 }
             }

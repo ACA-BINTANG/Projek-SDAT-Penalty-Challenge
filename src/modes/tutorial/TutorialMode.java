@@ -94,29 +94,8 @@ public class TutorialMode extends GameEngine {
         goalGuideMarker.setMouseTransparent(true);
         goalGuideMarker.setVisible(false);
 
-        Text ballGuideLabel = new Text("KICK");
-        ballGuideLabel.setFill(Color.BLACK);
-        ballGuideLabel.setStroke(Color.TRANSPARENT);
-        ballGuideLabel.setStrokeWidth(0);
-        ballGuideLabel.setFont(loadFont(MENU_FONT_PATH, 15, Font.font("Arial", FontWeight.EXTRA_BOLD, 15)));
-        ballGuideLabel.setMouseTransparent(true);
-        ballGuideLabel.setVisible(false);
-
-        Text goalGuideLabel = new Text("GOAL TARGET");
-        goalGuideLabel.setFill(Color.BLACK);
-        goalGuideLabel.setStroke(Color.TRANSPARENT);
-        goalGuideLabel.setStrokeWidth(0);
-        goalGuideLabel.setFont(loadFont(MENU_FONT_PATH, 15, Font.font("Arial", FontWeight.EXTRA_BOLD, 15)));
-        goalGuideLabel.setMouseTransparent(true);
-        goalGuideLabel.setVisible(false);
-
-        Text keeperGuideLabel = new Text("CATCH HERE");
-        keeperGuideLabel.setFill(Color.BLACK);
-        keeperGuideLabel.setStroke(Color.TRANSPARENT);
-        keeperGuideLabel.setStrokeWidth(0);
-        keeperGuideLabel.setFont(loadFont(MENU_FONT_PATH, 15, Font.font("Arial", FontWeight.EXTRA_BOLD, 15)));
-        keeperGuideLabel.setMouseTransparent(true);
-        keeperGuideLabel.setVisible(false);
+        // Tidak ada lagi teks KICK, GOAL TARGET, atau CATCH HERE di area permainan.
+        // Lingkaran kuning tetap menjadi penanda visual; penjelasan ditampilkan melalui hint tutorial.
 
         Rectangle keeperBoxOverlay = new Rectangle();
         keeperBoxOverlay.setFill(Color.rgb(0, 255, 80, 0.18));
@@ -149,7 +128,7 @@ public class TutorialMode extends GameEngine {
         ));
         titleText.setLayoutY(52);
 
-        Text hintText = new Text("STEP 1: Left-click and hold the ball marked in yellow.");
+        Text hintText = new Text("STEP 1: Left-click and hold the ball inside the yellow circle.");
         hintText.setFill(Color.rgb(255, 255, 255, 0.92));
         hintText.setFont(loadFont(MENU_FONT_PATH, 18, Font.font("Arial", FontWeight.BOLD, 18)));
         // Petunjuk Tutorial diletakkan di bawah informasi TARGET dan NYAWA.
@@ -208,9 +187,6 @@ public class TutorialMode extends GameEngine {
                 ball,
                 ballGuideMarker,
                 targetMarker,
-                ballGuideLabel,
-                goalGuideLabel,
-                keeperGuideLabel,
                 goalText,
                 topHudBackground,
                 tutorialTargetText,
@@ -247,9 +223,7 @@ public class TutorialMode extends GameEngine {
             if (state.phase == TutorialPhase.KEEPER_AIM) {
                 tutorialTargetText.setText("TARGET: SAVE THE BALL");
                 ballGuideMarker.setVisible(false);
-                ballGuideLabel.setVisible(false);
                 goalGuideMarker.setVisible(false);
-                goalGuideLabel.setVisible(false);
 
                 prepareTutorialAutoShot(root, ball, targetMarker, state);
                 targetMarker.setRadius(28);
@@ -258,13 +232,6 @@ public class TutorialMode extends GameEngine {
                 targetMarker.setStrokeWidth(5);
                 targetMarker.getStrokeDashArray().setAll(10.0, 6.0);
 
-                keeperGuideLabel.setLayoutX(clamp(
-                        state.targetX - keeperGuideLabel.getLayoutBounds().getWidth() / 2,
-                        16,
-                        root.getWidth() - keeperGuideLabel.getLayoutBounds().getWidth() - 16
-                ));
-                keeperGuideLabel.setLayoutY(Math.max(145, state.targetY - 42));
-                keeperGuideLabel.setVisible(true);
                 ball.setCursor(Cursor.DEFAULT);
             } else if (state.phase == TutorialPhase.KICKER) {
                 tutorialTargetText.setText("TARGET: SCORE A GOAL");
@@ -273,14 +240,10 @@ public class TutorialMode extends GameEngine {
                 targetMarker.setStroke(Color.WHITE);
                 targetMarker.setStrokeWidth(3);
                 targetMarker.getStrokeDashArray().clear();
-                keeperGuideLabel.setVisible(false);
 
                 ballGuideMarker.setCenterX(state.anchorX);
                 ballGuideMarker.setCenterY(state.anchorY);
                 ballGuideMarker.setVisible(true);
-                ballGuideLabel.setLayoutX(state.anchorX - ballGuideLabel.getLayoutBounds().getWidth() / 2);
-                ballGuideLabel.setLayoutY(state.anchorY - BALL_SIZE * 0.78);
-                ballGuideLabel.setVisible(true);
 
                 double guideX = root.getWidth() * (GOAL_LEFT_RATIO
                         + (GOAL_RIGHT_RATIO - GOAL_LEFT_RATIO) * 0.22);
@@ -289,9 +252,6 @@ public class TutorialMode extends GameEngine {
                 goalGuideMarker.setCenterX(guideX);
                 goalGuideMarker.setCenterY(guideY);
                 goalGuideMarker.setVisible(true);
-                goalGuideLabel.setLayoutX(guideX - goalGuideLabel.getLayoutBounds().getWidth() / 2);
-                goalGuideLabel.setLayoutY(guideY - 48);
-                goalGuideLabel.setVisible(true);
                 ball.setCursor(Cursor.HAND);
             }
         };
@@ -303,10 +263,7 @@ public class TutorialMode extends GameEngine {
             state.ballMoving = false;
             state.dragging = false;
             ballGuideMarker.setVisible(false);
-            ballGuideLabel.setVisible(false);
             goalGuideMarker.setVisible(false);
-            goalGuideLabel.setVisible(false);
-            keeperGuideLabel.setVisible(false);
             targetMarker.setVisible(false);
             ball.setCursor(Cursor.DEFAULT);
             titleText.setText("TUTORIAL COMPLETE");
@@ -359,8 +316,7 @@ public class TutorialMode extends GameEngine {
                 ballGuideMarker.setCenterX(state.anchorX);
                 ballGuideMarker.setCenterY(state.anchorY);
                 ballGuideMarker.setVisible(true);
-                ballGuideLabel.setVisible(true);
-                hintText.setText("STEP 1: Left-click and hold the ball marked in yellow.");
+                hintText.setText("STEP 1: Left-click and hold the ball inside the yellow circle.");
             }
             event.consume();
         });
@@ -418,8 +374,7 @@ public class TutorialMode extends GameEngine {
             pullLine.setVisible(true);
             targetMarker.setVisible(false);
             ballGuideMarker.setVisible(false);
-            ballGuideLabel.setVisible(false);
-            hintText.setText("STEP 2: Drag the ball until the yellow aim marker reaches the GOAL TARGET.");
+            hintText.setText("STEP 2: Drag the ball backward and aim the yellow marker at the yellow circle inside the goal.");
         });
 
         ball.setOnMouseDragged(event -> {
@@ -478,13 +433,11 @@ public class TutorialMode extends GameEngine {
                 ballGuideMarker.setCenterX(state.anchorX);
                 ballGuideMarker.setCenterY(state.anchorY);
                 ballGuideMarker.setVisible(true);
-                ballGuideLabel.setVisible(true);
-                hintText.setText("The pull is too weak. Drag farther toward the yellow GOAL TARGET.");
+                hintText.setText("The pull is too weak. Drag farther and aim at the yellow circle inside the goal.");
                 return;
             }
 
             goalGuideMarker.setVisible(false);
-            goalGuideLabel.setVisible(false);
             hintText.setText("STEP 4: Watch your shot and score a GOAL!");
             chooseKeeperTarget(root, state);
             // Tahap penendang dibuat ramah pemula: keeper tutorial tidak menggagalkan tendangan.
@@ -511,13 +464,13 @@ public class TutorialMode extends GameEngine {
             double selectedX = event.getX();
             double selectedY = event.getY();
             if (!isPointInsidePointBox(root, selectedX, selectedY)) {
-                hintText.setText("STEP 6: Click the yellow circle in the goal area to aim the keeper.");
+                hintText.setText("STEP 6: Click the yellow circle inside the goal to choose the keeper catch position.");
                 return;
             }
 
             double distanceToCatchGuide = Math.hypot(selectedX - state.targetX, selectedY - state.targetY);
             if (distanceToCatchGuide > 62) {
-                hintText.setText("STEP 6: Click directly on the yellow CATCH HERE marker.");
+                hintText.setText("STEP 6: Click directly inside the yellow circle in the goal.");
                 return;
             }
 
@@ -525,7 +478,6 @@ public class TutorialMode extends GameEngine {
             prepareTutorialKeeperTarget(root, state, state.targetX, state.targetY);
             state.keeperWillCatch = true;
             targetMarker.setVisible(false);
-            keeperGuideLabel.setVisible(false);
             keeperAnimator.startDive(state.keeperDiveDirection, state.keeperWillCatch, state.keeperVerticalJump);
             state.phase = TutorialPhase.KEEPER_EXECUTING;
             state.ballMoving = true;

@@ -170,7 +170,7 @@ public class GameApp extends Application {
     protected static final int ROUND_RESULT_GOAL = 2;
     protected static final int ROUND_RESULT_MISS = 3;
     protected static final boolean SHOW_DEBUG_BOXES = false;
-    protected static final int MAX_PLAYER_LIVES = 10;
+    protected static final int MAX_PLAYER_LIVES = 3;
     protected static final int MAX_ENDLESS_SCOREBOARD_ENTRIES = 30;
     protected static final int TOURNAMENT_SHOTS_PER_ROUND = 5;
     protected static final int MULTIPLAYER_SHOTS_PER_PLAYER = 5;
